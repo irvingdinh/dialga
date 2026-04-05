@@ -344,5 +344,26 @@ export const api = {
       request<{ success: true }>(`/api/threads/${threadId}`, {
         method: "DELETE",
       }),
+    exportMarkdown: async (threadId: string): Promise<void> => {
+      const res = await fetch(`/api/threads/${threadId}/export.md`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(res.status, body.message ?? res.statusText);
+      }
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const filenameMatch = disposition.match(/filename="(.+)"/);
+      const filename = filenameMatch?.[1] ?? "thread.md";
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
   },
 };

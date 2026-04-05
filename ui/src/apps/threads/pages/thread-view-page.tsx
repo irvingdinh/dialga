@@ -10,6 +10,7 @@ import {
   ArchiveRestoreIcon,
   ArrowLeftIcon,
   ChevronUpIcon,
+  DownloadIcon,
   FolderIcon,
   FolderOpenIcon,
   LoaderIcon,
@@ -479,6 +480,17 @@ export default function ThreadViewPage() {
     searchInputRef.current?.focus();
   }, []);
 
+  const handleExport = useCallback(async () => {
+    if (!threadId) return;
+    try {
+      await api.threads.exportMarkdown(threadId);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Failed to export thread";
+      toast.error(message);
+    }
+  }, [threadId]);
+
   const isOffline =
     machineStatus === "offline" ||
     (!machineStatus && machine?.status === "offline");
@@ -566,6 +578,15 @@ export default function ThreadViewPage() {
                 title="Search messages"
               >
                 <SearchIcon className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleExport}
+                className="text-muted-foreground shrink-0"
+                title="Export as Markdown"
+              >
+                <DownloadIcon className="size-4" />
               </Button>
               <Button
                 variant="ghost"

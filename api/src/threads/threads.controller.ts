@@ -3,13 +3,16 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { IsOptional, IsString } from 'class-validator';
+import type { Response } from 'express';
 
 import { CurrentUser } from '../core/decorators/current-user.decorator.js';
 import type { User } from '../core/entities/index.js';
@@ -130,6 +133,28 @@ export class ThreadsController {
       created_at: t.created_at,
       updated_at: t.updated_at,
     };
+  }
+
+  @Get('threads/:id/export.md')
+  @Header('Content-Type', 'text/markdown; charset=utf-8')
+  async exportMarkdown(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const markdown = await this.threadsService.exportAsMarkdown(id, user.id);
+    const thread = await this.threadsService.findOne(id, user.id);
+    const filename = (thread.title ?? 'thread')
+      .replace(/[^a-zA-Z0-9_\- ]/g, '')
+      .replace(/\s+/g, '-')
+      .slice(0, 80)
+      .toLowerCase();
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}.md"`,
+    );
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.send(markdown);
   }
 
   @Delete('threads/:id')

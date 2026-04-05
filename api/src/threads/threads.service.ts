@@ -208,6 +208,137 @@ export class ThreadsService {
     return this.threadRepository.save(thread);
   }
 
+  async exportAsMarkdown(id: string, userId: string): Promise<string> {
+    const thread = await this.findOne(id, userId);
+    const messages = await this.messageRepository.find({
+      where: { thread_id: id },
+      order: { created_at: 'ASC' },
+    });
+
+    const lines: string[] = [];
+
+    // Header
+    lines.push(`# ${thread.title ?? 'Untitled Thread'}`);
+    lines.push('');
+    if (thread.workspace?.name) {
+      lines.push(
+        `**Workspace:** ${thread.workspace.name} (\`${thread.workspace.working_directory}\`)`,
+      );
+    }
+    lines.push(
+      `**Created:** ${thread.created_at
+        .toISOString()
+        .replace('T', ' ')
+        .replace(/\.\d{3}Z$/, ' UTC')}`,
+    );
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+
+    for (const msg of messages) {
+      if (msg.role === 'system') continue;
+
+      const timestamp = msg.created_at
+        .toISOString()
+        .replace('T', ' ')
+        .replace(/\.\d{3}Z$/, ' UTC');
+      const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
+
+      lines.push(`## ${roleLabel}`);
+      lines.push(`*${timestamp}*`);
+      if (msg.role === 'assistant' && msg.model) {
+        lines.push(`*Model: ${msg.model}*`);
+      }
+      lines.push('');
+
+      // Parse metadata events for assistant messages with rich content
+      if (msg.role === 'assistant' && msg.metadata) {
+        try {
+          const meta = JSON.parse(msg.metadata);
+          if (meta.events && Array.isArray(meta.events)) {
+            for (const event of meta.events) {
+              switch (event.type) {
+                case 'thinking':
+                  lines.push('<details>');
+                  lines.push('<summary>Thinking</summary>');
+                  lines.push('');
+                  lines.push(event.content ?? '');
+                  lines.push('</details>');
+                  lines.push('');
+                  break;
+                case 'text':
+                  lines.push(event.content ?? '');
+                  lines.push('');
+                  break;
+                case 'tool_call':
+                  lines.push(
+                    `**Tool: ${event.tool ?? 'unknown'}**${event.file ? ` — \`${event.file}\`` : ''}`,
+                  );
+                  if (event.content) {
+                    lines.push('```');
+                    lines.push(event.content);
+                    lines.push('```');
+                  }
+                  lines.push('');
+                  break;
+                case 'tool_result':
+                  lines.push('**Result:**');
+                  if (event.content) {
+                    lines.push('```');
+                    lines.push(event.content);
+                    lines.push('```');
+                  }
+                  lines.push('');
+                  break;
+                case 'result':
+                  if (event.metadata) {
+                    const parts: string[] = [];
+                    if (event.metadata.tokens_used)
+                      parts.push(
+                        `${event.metadata.tokens_used.toLocaleString()} tokens`,
+                      );
+                    if (event.metadata.duration_ms)
+                      parts.push(
+                        `${(event.metadata.duration_ms / 1000).toFixed(1)}s`,
+                      );
+                    if (event.metadata.total_cost_usd)
+                      parts.push(
+                        `$${event.metadata.total_cost_usd.toFixed(4)}`,
+                      );
+                    if (parts.length > 0) {
+                      lines.push(`*${parts.join(' · ')}*`);
+                      lines.push('');
+                    }
+                  }
+                  break;
+              }
+            }
+          } else {
+            // Metadata without events array — just use content
+            if (msg.content) {
+              lines.push(msg.content);
+              lines.push('');
+            }
+          }
+        } catch {
+          // Invalid JSON metadata — fall back to content
+          if (msg.content) {
+            lines.push(msg.content);
+            lines.push('');
+          }
+        }
+      } else if (msg.content) {
+        lines.push(msg.content);
+        lines.push('');
+      }
+
+      lines.push('---');
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const thread = await this.findOne(id, userId);
     await this.messageRepository.delete({ thread_id: id });
