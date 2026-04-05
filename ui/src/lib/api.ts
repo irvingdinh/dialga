@@ -1,3 +1,15 @@
+export interface HealthInfo {
+  agents: {
+    claude: { available: boolean; version?: string; error?: string };
+    codex: { available: boolean; version?: string; error?: string };
+  };
+  os: string;
+  os_version: string;
+  arch: string;
+  node_version: string;
+  running_tasks: string[];
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -48,6 +60,7 @@ export const api = {
           default_agent: string;
           default_model: string;
           status: string;
+          health_info: HealthInfo | null;
           last_seen_at: string | null;
           created_at: string;
         }>
@@ -68,6 +81,7 @@ export const api = {
         default_agent: string;
         default_model: string;
         status: string;
+        health_info: HealthInfo | null;
         last_seen_at: string | null;
         created_at: string;
       }>(`/api/machines/${id}`),

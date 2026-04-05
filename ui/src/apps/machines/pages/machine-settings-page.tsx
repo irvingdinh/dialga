@@ -2,8 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircleIcon,
   ArrowLeftIcon,
+  CheckCircle2Icon,
   CheckIcon,
+  CpuIcon,
   KeyRoundIcon,
+  XCircleIcon,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -17,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type HealthInfo } from "@/lib/api";
 
 function SettingsSkeleton() {
   return (
@@ -278,6 +281,11 @@ export default function MachineSettingsPage() {
 
           <Separator className="my-6" />
 
+          {/* Machine Health */}
+          <MachineHealth healthInfo={machine.health_info ?? null} />
+
+          <Separator className="my-6" />
+
           {/* API Token */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
@@ -326,6 +334,86 @@ export default function MachineSettingsPage() {
           />
         </>
       )}
+    </div>
+  );
+}
+
+function MachineHealth({ healthInfo }: { healthInfo: HealthInfo | null }) {
+  if (!healthInfo) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <CpuIcon className="text-muted-foreground size-4" />
+          <h2 className="text-sm font-semibold">System Health</h2>
+        </div>
+        <p className="text-muted-foreground text-xs">
+          No health data yet. Connect the agent to see system information.
+        </p>
+      </div>
+    );
+  }
+
+  const { agents, os, os_version, arch, node_version } = healthInfo;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <CpuIcon className="text-muted-foreground size-4" />
+        <h2 className="text-sm font-semibold">System Health</h2>
+      </div>
+
+      {/* Agents */}
+      <div className="flex flex-col gap-2">
+        <Label className="text-xs">Available Agents</Label>
+        <div className="flex flex-col gap-1.5">
+          {(["claude", "codex"] as const).map((key) => {
+            const agent = agents[key];
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between rounded-md border px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  {agent.available ? (
+                    <CheckCircle2Icon className="size-3.5 text-emerald-500" />
+                  ) : (
+                    <XCircleIcon className="text-muted-foreground/40 size-3.5" />
+                  )}
+                  <span className="text-sm">
+                    {key === "claude" ? "Claude Code" : "Codex CLI"}
+                  </span>
+                </div>
+                <span className="text-muted-foreground font-mono text-xs">
+                  {agent.available
+                    ? agent.version
+                    : (agent.error ?? "unavailable")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* System Info */}
+      <div className="flex flex-col gap-1">
+        <Label className="text-xs">System</Label>
+        <div className="text-muted-foreground flex flex-col gap-0.5 text-xs">
+          <div className="flex justify-between">
+            <span>OS</span>
+            <span className="font-mono">
+              {os} {os_version}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Architecture</span>
+            <span className="font-mono">{arch}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Node.js</span>
+            <span className="font-mono">{node_version}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

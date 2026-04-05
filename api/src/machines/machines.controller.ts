@@ -61,6 +61,7 @@ export class MachinesController {
       default_agent: m.default_agent,
       default_model: m.default_model,
       status: m.status,
+      health_info: m.health_info,
       last_seen_at: m.last_seen_at,
       created_at: m.created_at,
     }));
@@ -85,6 +86,7 @@ export class MachinesController {
       default_agent: m.default_agent,
       default_model: m.default_model,
       status: m.status,
+      health_info: m.health_info,
       last_seen_at: m.last_seen_at,
       created_at: m.created_at,
     };

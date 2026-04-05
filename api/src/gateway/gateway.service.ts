@@ -322,6 +322,10 @@ export class GatewayService {
     this.logger.log(
       `Health report from machine ${machineId}: ${JSON.stringify(data)}`,
     );
+    void this.machineRepository.query(
+      'UPDATE machines SET health_info = ? WHERE id = ?',
+      [JSON.stringify(data), machineId],
+    );
   }
 
   // --- Request/Response Correlation ---

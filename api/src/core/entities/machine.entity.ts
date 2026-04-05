@@ -38,6 +38,9 @@ export class Machine {
   @Column('enum', { enum: ['online', 'offline'], default: 'offline' })
   status: 'online' | 'offline';
 
+  @Column('json', { nullable: true })
+  health_info: Record<string, unknown> | null;
+
   @Column('datetime', { nullable: true })
   last_seen_at: Date | null;
 
