@@ -6,16 +6,18 @@ import {
   MessageSquareIcon,
   PlusIcon,
   SettingsIcon,
+  Trash2Icon,
   WifiOffIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 
 import { CreateThreadDialog } from "@/apps/threads/components/create-thread-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -58,6 +60,7 @@ export default function ThreadsPage() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [workspaceFilter, setWorkspaceFilter] = useState<string>("all");
+  const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
   const { data: machine } = useQuery({
     queryKey: ["machine", machineId],
@@ -138,6 +141,21 @@ export default function ThreadsPage() {
       navigate(`/threads/${threadId}`);
     },
     [refetch, navigate],
+  );
+
+  const handleDeleteThread = useCallback(
+    async (threadId: string) => {
+      try {
+        await api.threads.delete(threadId);
+        setDeletingThreadId(null);
+        queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : "Failed to delete thread";
+        toast.error(message);
+      }
+    },
+    [machineId, queryClient],
   );
 
   const isOffline = machine?.status === "offline";
@@ -247,36 +265,74 @@ export default function ThreadsPage() {
           )}
 
           {filteredThreads.map((thread) => (
-            <button
-              key={thread.id}
-              onClick={() => navigate(`/threads/${thread.id}`)}
-              className="hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors"
-            >
-              <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">
-                  {thread.title ?? "New thread"}
+            <div key={thread.id} className="relative">
+              {deletingThreadId === thread.id ? (
+                <div className="flex flex-col gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm text-red-800">
+                    Delete this thread and all its messages?
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeletingThreadId(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteThread(thread.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-                <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
-                  {thread.workspace_name && (
-                    <>
-                      <span className="flex items-center gap-1">
-                        <FolderIcon className="size-3" />
-                        {thread.workspace_name}
-                      </span>
-                      <span>·</span>
-                    </>
-                  )}
-                  <span>{timeAgo(thread.updated_at)}</span>
+              ) : (
+                <div className="group hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors">
+                  <button
+                    onClick={() => navigate(`/threads/${thread.id}`)}
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                  >
+                    <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">
+                        {thread.title ?? "New thread"}
+                      </div>
+                      <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                        {thread.workspace_name && (
+                          <>
+                            <span className="flex items-center gap-1">
+                              <FolderIcon className="size-3" />
+                              {thread.workspace_name}
+                            </span>
+                            <span>·</span>
+                          </>
+                        )}
+                        <span>{timeAgo(thread.updated_at)}</span>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={
+                        thread.status === "active" ? "secondary" : "outline"
+                      }
+                      className="mt-0.5 shrink-0"
+                    >
+                      {thread.status}
+                    </Badge>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingThreadId(thread.id);
+                    }}
+                    className="text-muted-foreground/40 hover:text-destructive mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100"
+                  >
+                    <Trash2Icon className="size-4" />
+                  </button>
                 </div>
-              </div>
-              <Badge
-                variant={thread.status === "active" ? "secondary" : "outline"}
-                className="mt-0.5 shrink-0"
-              >
-                {thread.status}
-              </Badge>
-            </button>
+              )}
+            </div>
           ))}
         </div>
       )}

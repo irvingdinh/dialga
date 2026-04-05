@@ -4,6 +4,7 @@ import {
   ArrowLeftIcon,
   MessageSquareIcon,
   PencilIcon,
+  Trash2Icon,
   WifiOffIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,6 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
+
+type DeleteState = "idle" | "confirming" | "deleting";
 
 function ThreadViewSkeleton() {
   return (
@@ -54,6 +57,9 @@ export default function ThreadViewPage() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // Delete state
+  const [deleteState, setDeleteState] = useState<DeleteState>("idle");
 
   // Streaming state
   const [streamingEvents, setStreamingEvents] = useState<
@@ -216,6 +222,23 @@ export default function ThreadViewPage() {
     setIsEditingTitle(false);
   }, []);
 
+  const handleDelete = useCallback(async () => {
+    if (!threadId || !thread) return;
+    setDeleteState("deleting");
+    try {
+      await api.threads.delete(threadId);
+      queryClient.invalidateQueries({
+        queryKey: ["threads", thread.machine_id],
+      });
+      navigate(`/machines/${thread.machine_id}/threads`);
+    } catch (err) {
+      setDeleteState("idle");
+      const message =
+        err instanceof ApiError ? err.message : "Failed to delete thread";
+      toast.error(message);
+    }
+  }, [threadId, thread, queryClient, navigate]);
+
   const handleSend = useCallback(
     async (content: string, model?: string) => {
       if (!threadId) return;
@@ -342,8 +365,47 @@ export default function ThreadViewPage() {
               </p>
             )}
           </div>
+          {!threadLoading && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setDeleteState("confirming")}
+              className="text-muted-foreground hover:text-destructive shrink-0"
+            >
+              <Trash2Icon className="size-4" />
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Delete Confirmation Banner */}
+      {deleteState !== "idle" && (
+        <div className="border-b px-4 py-2">
+          <div className="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
+            <p className="text-sm text-red-800">
+              Delete this thread and all its messages?
+            </p>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteState("idle")}
+                disabled={deleteState === "deleting"}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleteState === "deleting"}
+              >
+                {deleteState === "deleting" ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Offline Banner */}
       {isOffline && (

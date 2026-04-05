@@ -273,5 +273,9 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    delete: (threadId: string) =>
+      request<{ success: true }>(`/api/threads/${threadId}`, {
+        method: "DELETE",
+      }),
   },
 };
