@@ -200,7 +200,7 @@ function StreamingContent({ events }: { events: StreamEvent[] }) {
             return (
               <div
                 key={i}
-                className="prose prose-sm prose-neutral dark:prose-invert max-w-none"
+                className="prose prose-sm prose-neutral dark:prose-invert max-w-none overflow-x-hidden"
               >
                 <Markdown>{group.content}</Markdown>
               </div>
@@ -340,7 +340,7 @@ export function MessageItem({
               })}
             </span>
           </div>
-          <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
+          <p className="mt-1 text-sm leading-relaxed break-words whitespace-pre-wrap">
             {message.content}
           </p>
         </div>
@@ -376,7 +376,7 @@ export function MessageItem({
 
           {/* Static content for completed messages */}
           {!hasStreamEvents && status === "completed" && message.content && (
-            <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none">
+            <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none overflow-x-hidden">
               <Markdown>{message.content}</Markdown>
             </div>
           )}

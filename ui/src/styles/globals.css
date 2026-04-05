@@ -123,8 +123,21 @@
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply font-sans;
+  }
+
+  /* Prevent horizontal overflow from code blocks inside markdown */
+  .prose pre {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .prose code {
+    word-break: break-word;
+  }
+  .prose pre code {
+    word-break: normal;
   }
 }

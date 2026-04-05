@@ -39,7 +39,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   }, []);
 
   return (
-    <div className="bg-background border-t px-4 pt-3 pb-4">
+    <div className="bg-background border-t px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto max-w-lg">
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1">

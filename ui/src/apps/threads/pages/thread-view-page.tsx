@@ -291,7 +291,7 @@ export default function ThreadViewPage() {
   const isPageError = threadError || messagesError;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       {/* Header */}
       <div className="border-b px-4 py-3">
         <div className="mx-auto flex max-w-lg items-center gap-2">

@@ -46,7 +46,7 @@ export default function MachinesPage() {
   });
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col px-4 py-6">
+    <div className="mx-auto flex min-h-dvh max-w-lg flex-col px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
