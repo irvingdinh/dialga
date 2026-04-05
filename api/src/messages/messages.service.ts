@@ -39,7 +39,7 @@ export class MessagesService {
     return thread;
   }
 
-  private async verifyThreadOwnership(
+  async verifyThreadOwnership(
     threadId: string,
     userId: string,
   ): Promise<Thread> {
@@ -52,12 +52,46 @@ export class MessagesService {
     return thread;
   }
 
-  async list(threadId: string, userId: string): Promise<Message[]> {
+  async list(
+    threadId: string,
+    userId: string,
+    options?: { limit?: number; before?: string },
+  ): Promise<{ messages: Message[]; has_more: boolean }> {
     await this.verifyThreadOwnership(threadId, userId);
-    return this.messageRepository.find({
-      where: { thread_id: threadId },
-      order: { created_at: 'ASC' },
-    });
+
+    const limit = options?.limit ?? 50;
+
+    const qb = this.messageRepository
+      .createQueryBuilder('msg')
+      .where('msg.thread_id = :threadId', { threadId });
+
+    if (options?.before) {
+      const cursor = await this.messageRepository.findOne({
+        where: { id: options.before },
+        select: ['created_at'],
+      });
+      if (cursor) {
+        qb.andWhere(
+          '(msg.created_at < :cursorDate OR (msg.created_at = :cursorDate AND msg.id < :cursorId))',
+          { cursorDate: cursor.created_at, cursorId: options.before },
+        );
+      }
+    }
+
+    // Fetch limit+1 in DESC order to check has_more
+    const messages = await qb
+      .orderBy('msg.created_at', 'DESC')
+      .addOrderBy('msg.id', 'DESC')
+      .take(limit + 1)
+      .getMany();
+
+    const has_more = messages.length > limit;
+    if (has_more) messages.pop();
+
+    // Reverse to ASC order for the client
+    messages.reverse();
+
+    return { messages, has_more };
   }
 
   async send(

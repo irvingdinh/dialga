@@ -5,6 +5,7 @@ import {
   Header,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -33,20 +34,33 @@ export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
   @Get('threads/:threadId/messages')
-  async list(@CurrentUser() user: User, @Param('threadId') threadId: string) {
-    const messages = await this.messagesService.list(threadId, user.id);
-    return messages.map((m) => ({
-      id: m.id,
-      thread_id: m.thread_id,
-      role: m.role,
-      content: m.content,
-      model: m.model,
-      status: m.status,
-      metadata: m.metadata ? JSON.parse(m.metadata) : null,
-      started_at: m.started_at,
-      completed_at: m.completed_at,
-      created_at: m.created_at,
-    }));
+  async list(
+    @CurrentUser() user: User,
+    @Param('threadId') threadId: string,
+    @Query('limit') limitStr?: string,
+    @Query('before') before?: string,
+  ) {
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+    const { messages, has_more } = await this.messagesService.list(
+      threadId,
+      user.id,
+      { limit, before },
+    );
+    return {
+      messages: messages.map((m) => ({
+        id: m.id,
+        thread_id: m.thread_id,
+        role: m.role,
+        content: m.content,
+        model: m.model,
+        status: m.status,
+        metadata: m.metadata ? JSON.parse(m.metadata) : null,
+        started_at: m.started_at,
+        completed_at: m.completed_at,
+        created_at: m.created_at,
+      })),
+      has_more,
+    };
   }
 
   @Post('threads/:threadId/messages')
@@ -114,8 +128,7 @@ export class MessagesController {
     @Param('threadId') threadId: string,
     @Res() res: Response,
   ) {
-    // Verify ownership
-    await this.messagesService.list(threadId, user.id);
+    await this.messagesService.verifyThreadOwnership(threadId, user.id);
     const jsonl = await this.messagesService.getAsJsonl(threadId);
     res.setHeader('Content-Type', 'application/x-ndjson');
     res.send(jsonl);

@@ -1,15 +1,22 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   AlertCircleIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArrowLeftIcon,
+  ChevronUpIcon,
+  LoaderIcon,
   MessageSquareIcon,
   PencilIcon,
   Trash2Icon,
   WifiOffIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -54,6 +61,7 @@ export default function ThreadViewPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -88,16 +96,40 @@ export default function ThreadViewPage() {
     enabled: !!thread?.machine_id,
   });
 
+  type MessagesPage = Awaited<ReturnType<typeof api.messages.list>>;
+
   const {
-    data: messages,
+    data: messagesData,
     isLoading: messagesLoading,
     isError: messagesError,
     refetch: refetchMessages,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["messages", threadId],
-    queryFn: () => api.messages.list(threadId!),
+    queryFn: ({ pageParam }) =>
+      api.messages.list(threadId!, {
+        limit: 50,
+        before: pageParam ?? undefined,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.has_more || lastPage.messages.length === 0) return null;
+      return lastPage.messages[0].id;
+    },
     enabled: !!threadId,
   });
+
+  // Flatten pages in chronological order (older pages last in array → reverse)
+  const messages = useMemo(
+    () =>
+      messagesData?.pages
+        .slice()
+        .reverse()
+        .flatMap((p) => p.messages) ?? [],
+    [messagesData],
+  );
 
   // SSE for thread streaming events
   useEffect(() => {
@@ -264,38 +296,45 @@ export default function ThreadViewPage() {
       if (!threadId) return;
       try {
         const result = await api.messages.send(threadId, { content, model });
-        // Optimistically add messages to the list
+        // Optimistically add messages to the newest page (pages[0])
         queryClient.setQueryData(
           ["messages", threadId],
-          (old: Awaited<ReturnType<typeof api.messages.list>> | undefined) => [
-            ...(old ?? []),
-            {
-              id: result.user_message.id,
-              thread_id: threadId,
-              role: "user" as const,
-              content,
-              model: null,
-              status: "completed",
-              metadata: null,
-              started_at: null,
-              completed_at: null,
-              created_at: result.user_message.created_at,
-            },
-            {
-              id: result.assistant_message.id,
-              thread_id: threadId,
-              role: "assistant" as const,
-              content: "",
-              model: result.assistant_message.model,
-              status: result.assistant_message.status,
-              metadata: null,
-              started_at: null,
-              completed_at: null,
-              created_at: result.assistant_message.created_at,
-            },
-          ],
+          (old: InfiniteData<MessagesPage> | undefined) => {
+            if (!old) return old;
+            const pages = [...old.pages];
+            pages[0] = {
+              ...pages[0],
+              messages: [
+                ...pages[0].messages,
+                {
+                  id: result.user_message.id,
+                  thread_id: threadId,
+                  role: "user" as const,
+                  content,
+                  model: null,
+                  status: "completed",
+                  metadata: null,
+                  started_at: null,
+                  completed_at: null,
+                  created_at: result.user_message.created_at,
+                },
+                {
+                  id: result.assistant_message.id,
+                  thread_id: threadId,
+                  role: "assistant" as const,
+                  content: "",
+                  model: result.assistant_message.model,
+                  status: result.assistant_message.status,
+                  metadata: null,
+                  started_at: null,
+                  completed_at: null,
+                  created_at: result.assistant_message.created_at,
+                },
+              ],
+            };
+            return { ...old, pages };
+          },
         );
-        // Also update thread title if it was empty
         queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
       } catch (err) {
         const message =
@@ -331,24 +370,32 @@ export default function ThreadViewPage() {
       if (!threadId) return;
       try {
         const result = await api.messages.retry(messageId);
-        // Optimistically add new assistant message to the list
+        // Optimistically add new assistant message to the newest page
         queryClient.setQueryData(
           ["messages", threadId],
-          (old: Awaited<ReturnType<typeof api.messages.list>> | undefined) => [
-            ...(old ?? []),
-            {
-              id: result.assistant_message.id,
-              thread_id: threadId,
-              role: "assistant" as const,
-              content: "",
-              model: result.assistant_message.model,
-              status: result.assistant_message.status,
-              metadata: null,
-              started_at: null,
-              completed_at: null,
-              created_at: result.assistant_message.created_at,
-            },
-          ],
+          (old: InfiniteData<MessagesPage> | undefined) => {
+            if (!old) return old;
+            const pages = [...old.pages];
+            pages[0] = {
+              ...pages[0],
+              messages: [
+                ...pages[0].messages,
+                {
+                  id: result.assistant_message.id,
+                  thread_id: threadId,
+                  role: "assistant" as const,
+                  content: "",
+                  model: result.assistant_message.model,
+                  status: result.assistant_message.status,
+                  metadata: null,
+                  started_at: null,
+                  completed_at: null,
+                  created_at: result.assistant_message.created_at,
+                },
+              ],
+            };
+            return { ...old, pages };
+          },
         );
       } catch (err) {
         const message =
@@ -358,6 +405,19 @@ export default function ThreadViewPage() {
     },
     [threadId, queryClient],
   );
+
+  const handleLoadOlder = useCallback(async () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const prevHeight = container.scrollHeight;
+    const prevScrollTop = container.scrollTop;
+    await fetchNextPage();
+    // Preserve scroll position after older messages are prepended
+    requestAnimationFrame(() => {
+      const newHeight = container.scrollHeight;
+      container.scrollTop = prevScrollTop + (newHeight - prevHeight);
+    });
+  }, [fetchNextPage]);
 
   const isOffline =
     machineStatus === "offline" ||
@@ -512,7 +572,7 @@ export default function ThreadViewPage() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-lg">
           {/* Loading */}
           {isPageLoading && <ThreadViewSkeleton />}
@@ -536,7 +596,7 @@ export default function ThreadViewPage() {
           )}
 
           {/* Empty state */}
-          {messages && messages.length === 0 && !isPageLoading && (
+          {messages.length === 0 && !isPageLoading && !isPageError && (
             <div className="flex flex-col items-center px-4 py-16 text-center">
               <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
               <p className="text-muted-foreground text-sm">
@@ -546,8 +606,28 @@ export default function ThreadViewPage() {
           )}
 
           {/* Message list */}
-          {messages && messages.length > 0 && (
+          {messages.length > 0 && (
             <div className="flex flex-col gap-6 px-4 py-4">
+              {/* Load older button */}
+              {hasNextPage && (
+                <div className="flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLoadOlder}
+                    disabled={isFetchingNextPage}
+                    className="text-muted-foreground gap-1.5 text-xs"
+                  >
+                    {isFetchingNextPage ? (
+                      <LoaderIcon className="size-3.5 animate-spin" />
+                    ) : (
+                      <ChevronUpIcon className="size-3.5" />
+                    )}
+                    {isFetchingNextPage ? "Loading..." : "Load older messages"}
+                  </Button>
+                </div>
+              )}
+
               {messages.map((msg) => {
                 const effectiveStatus =
                   messageStatuses.get(msg.id) ?? msg.status;

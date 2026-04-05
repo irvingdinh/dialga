@@ -190,9 +190,13 @@ export const api = {
   },
 
   messages: {
-    list: (threadId: string) =>
-      request<
-        Array<{
+    list: (threadId: string, params?: { limit?: number; before?: string }) => {
+      const sp = new URLSearchParams();
+      if (params?.limit) sp.set("limit", String(params.limit));
+      if (params?.before) sp.set("before", params.before);
+      const query = sp.toString() ? `?${sp.toString()}` : "";
+      return request<{
+        messages: Array<{
           id: string;
           thread_id: string;
           role: "user" | "assistant" | "system";
@@ -203,8 +207,10 @@ export const api = {
           started_at: string | null;
           completed_at: string | null;
           created_at: string;
-        }>
-      >(`/api/threads/${threadId}/messages`),
+        }>;
+        has_more: boolean;
+      }>(`/api/threads/${threadId}/messages${query}`);
+    },
     send: (threadId: string, data: { content: string; model?: string }) =>
       request<{
         user_message: {
