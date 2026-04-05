@@ -36,22 +36,37 @@ export class ThreadsService {
     userId: string,
     workspaceId?: string,
     status?: string,
+    q?: string,
   ): Promise<Thread[]> {
     await this.verifyMachineOwnership(machineId, userId);
-    const where: Record<string, unknown> = { machine_id: machineId };
-    if (workspaceId) where.workspace_id = workspaceId;
-    if (status === 'archived') {
-      where.status = 'archived';
-    } else if (status === 'all') {
-      // no filter — return both active and archived
-    } else {
-      where.status = 'active';
+
+    const qb = this.threadRepository
+      .createQueryBuilder('thread')
+      .leftJoinAndSelect('thread.workspace', 'workspace')
+      .where('thread.machine_id = :machineId', { machineId });
+
+    if (workspaceId) {
+      qb.andWhere('thread.workspace_id = :workspaceId', { workspaceId });
     }
-    return this.threadRepository.find({
-      where,
-      relations: ['workspace'],
-      order: { updated_at: 'DESC' },
-    });
+
+    if (status === 'archived') {
+      qb.andWhere('thread.status = :status', { status: 'archived' });
+    } else if (status !== 'all') {
+      qb.andWhere('thread.status = :status', { status: 'active' });
+    }
+
+    if (q) {
+      qb.leftJoin('thread.messages', 'message')
+        .andWhere('(thread.title LIKE :q OR message.content LIKE :q)', {
+          q: `%${q}%`,
+        })
+        .groupBy('thread.id')
+        .addGroupBy('workspace.id');
+    }
+
+    qb.orderBy('thread.updated_at', 'DESC');
+
+    return qb.getMany();
   }
 
   async create(

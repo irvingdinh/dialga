@@ -7,11 +7,13 @@ import {
   FolderIcon,
   MessageSquareIcon,
   PlusIcon,
+  SearchIcon,
   SettingsIcon,
   Trash2Icon,
   WifiOffIcon,
+  XIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -64,6 +66,20 @@ export default function ThreadsPage() {
   const [workspaceFilter, setWorkspaceFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchInput]);
 
   const { data: machine } = useQuery({
     queryKey: ["machine", machineId],
@@ -77,10 +93,16 @@ export default function ThreadsPage() {
     isLoading: threadsLoading,
     isError: threadsError,
   } = useQuery({
-    queryKey: ["threads", machineId, showArchived ? "all" : "active"],
+    queryKey: [
+      "threads",
+      machineId,
+      showArchived ? "all" : "active",
+      searchQuery,
+    ],
     queryFn: () =>
       api.threads.list(machineId!, {
         status: showArchived ? "all" : "active",
+        q: searchQuery || undefined,
       }),
     enabled: !!machineId,
   });
@@ -236,8 +258,32 @@ export default function ThreadsPage() {
         </div>
       )}
 
+      {/* Search */}
+      <div className="relative mt-4">
+        <SearchIcon className="text-muted-foreground/50 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+        <input
+          ref={searchInputRef}
+          type="text"
+          placeholder="Search threads..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="border-input bg-background text-foreground placeholder:text-muted-foreground/50 w-full rounded-xl border py-2 pr-9 pl-9 text-sm focus:ring-2 focus:ring-neutral-300 focus:outline-none dark:focus:ring-neutral-600"
+        />
+        {searchInput && (
+          <button
+            onClick={() => {
+              setSearchInput("");
+              searchInputRef.current?.focus();
+            }}
+            className="text-muted-foreground/50 hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+          >
+            <XIcon className="size-4" />
+          </button>
+        )}
+      </div>
+
       {/* Filters */}
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-2">
         {workspaces && workspaces.length > 0 && (
           <select
             value={workspaceFilter}
@@ -290,9 +336,20 @@ export default function ThreadsPage() {
         <div className="mt-4 flex flex-col gap-2">
           {filteredThreads.length === 0 && (
             <div className="text-muted-foreground flex flex-col items-center py-16 text-center text-sm">
-              <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
-              <p>No threads yet.</p>
-              <p className="mt-1">Start a conversation with your machine.</p>
+              {searchQuery ? (
+                <>
+                  <SearchIcon className="text-muted-foreground/40 mb-3 size-8" />
+                  <p>No threads match &ldquo;{searchQuery}&rdquo;</p>
+                </>
+              ) : (
+                <>
+                  <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
+                  <p>No threads yet.</p>
+                  <p className="mt-1">
+                    Start a conversation with your machine.
+                  </p>
+                </>
+              )}
             </div>
           )}
 

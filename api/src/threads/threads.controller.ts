@@ -47,12 +47,14 @@ export class ThreadsController {
     @Param('machineId') machineId: string,
     @Query('workspace_id') workspaceId?: string,
     @Query('status') status?: string,
+    @Query('q') q?: string,
   ) {
     const threads = await this.threadsService.list(
       machineId,
       user.id,
       workspaceId,
       status,
+      q,
     );
     return threads.map((t) => ({
       id: t.id,
