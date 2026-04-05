@@ -232,22 +232,41 @@ export class GatewayService {
       custom_instruction: customInstruction,
     };
 
-    const sent = this.sendToMachine(machineId, 'task:start', taskData);
+    // Message stays "queued" until the agent sends task:started
+    // (agent may queue the task internally if workspace is busy)
+    return this.sendToMachine(machineId, 'task:start', taskData);
+  }
 
-    if (sent) {
-      assistantMessage.status = 'running';
-      assistantMessage.started_at = new Date();
-      await this.messageRepository.save(assistantMessage);
+  async handleTaskStarted(
+    machineId: string,
+    data: { message_id: string },
+  ): Promise<void> {
+    const message = await this.messageRepository.findOne({
+      where: { id: data.message_id },
+      relations: ['thread'],
+    });
+    if (!message || message.thread.machine_id !== machineId) return;
 
-      // Notify SSE subscribers that message status changed to running
-      await this.streamingService.publishMessageStatus(
-        assistantMessage.thread_id,
-        assistantMessage.id,
-        'running',
-      );
+    // Only transition from queued → running
+    if (message.status !== 'queued') {
+      // If message was already cancelled, tell agent to stop
+      if (message.status === 'cancelled') {
+        this.sendToMachine(machineId, 'task:cancel', {
+          message_id: data.message_id,
+        });
+      }
+      return;
     }
 
-    return sent;
+    message.status = 'running';
+    message.started_at = new Date();
+    await this.messageRepository.save(message);
+
+    await this.streamingService.publishMessageStatus(
+      message.thread_id,
+      message.id,
+      'running',
+    );
   }
 
   async handleTaskOutput(
@@ -288,6 +307,15 @@ export class GatewayService {
       relations: ['thread'],
     });
     if (!message || message.thread.machine_id !== machineId) return;
+
+    // Don't overwrite terminal statuses (e.g. user already cancelled)
+    const terminalStatuses = ['completed', 'cancelled', 'error', 'timed_out'];
+    if (terminalStatuses.includes(message.status)) {
+      this.logger.log(
+        `Ignoring task:complete for ${data.message_id} — already "${message.status}"`,
+      );
+      return;
+    }
 
     message.status = data.status;
     message.content = data.summary || message.content;
@@ -414,14 +442,18 @@ export class GatewayService {
       .getMany();
 
     for (const assistantMsg of queuedMessages) {
-      // Find the user message that preceded this assistant message
-      const userMessage = await this.messageRepository.findOne({
-        where: {
-          thread_id: assistantMsg.thread_id,
-          role: 'user',
-        },
-        order: { created_at: 'DESC' },
-      });
+      // Find the user message that immediately precedes this assistant message
+      const userMessage = await this.messageRepository
+        .createQueryBuilder('message')
+        .where('message.thread_id = :threadId', {
+          threadId: assistantMsg.thread_id,
+        })
+        .andWhere('message.role = :role', { role: 'user' })
+        .andWhere('message.created_at <= :createdAt', {
+          createdAt: assistantMsg.created_at,
+        })
+        .orderBy('message.created_at', 'DESC')
+        .getOne();
 
       if (userMessage) {
         await this.dispatchTaskWithPrompt(

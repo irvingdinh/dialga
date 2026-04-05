@@ -161,15 +161,34 @@ export class TaskService implements OnModuleInit {
 
   @OnEvent('ws.task:cancel')
   onTaskCancel(data: { message_id: string }): void {
+    // Check if task is running — kill the process
     const task = this.runningTasks.get(data.message_id);
-    if (!task) {
-      this.logger.warn(`Cancel requested for unknown task: ${data.message_id}`);
+    if (task) {
+      this.logger.log(`Cancelling running task: ${data.message_id}`);
+      if (task.timeoutTimer) clearTimeout(task.timeoutTimer);
+      task.adapter.cancel(task.process);
       return;
     }
 
-    this.logger.log(`Cancelling task: ${data.message_id}`);
-    if (task.timeoutTimer) clearTimeout(task.timeoutTimer);
-    task.adapter.cancel(task.process);
+    // Check if task is queued — remove from workspace queue
+    for (const [workDir, queue] of this.workspaceQueues) {
+      const idx = queue.findIndex(
+        (q) => q.payload.message_id === data.message_id,
+      );
+      if (idx !== -1) {
+        queue.splice(idx, 1);
+        if (queue.length === 0) this.workspaceQueues.delete(workDir);
+        this.logger.log(`Cancelled queued task: ${data.message_id}`);
+        this.wsService.send('task:complete', {
+          message_id: data.message_id,
+          status: 'cancelled',
+          summary: 'Task cancelled by user',
+        });
+        return;
+      }
+    }
+
+    this.logger.warn(`Cancel requested for unknown task: ${data.message_id}`);
   }
 
   private async executeTask(
@@ -226,6 +245,11 @@ export class TaskService implements OnModuleInit {
     };
 
     this.runningTasks.set(payload.message_id, task);
+
+    // Notify API that this task is now actually running (not just queued)
+    this.wsService.send('task:started', {
+      message_id: payload.message_id,
+    });
 
     // Persist to SQLite for crash recovery
     await this.taskRecordRepository.save({

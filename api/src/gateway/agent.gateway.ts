@@ -74,6 +74,13 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
         );
         break;
 
+      case 'task:started':
+        await this.gatewayService.handleTaskStarted(
+          machineId,
+          parsed.data as { message_id: string },
+        );
+        break;
+
       case 'task:output':
         await this.gatewayService.handleTaskOutput(
           machineId,

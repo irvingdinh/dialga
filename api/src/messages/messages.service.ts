@@ -137,14 +137,13 @@ export class MessagesService {
       );
     }
 
-    // Send cancel event to agent if task is running
-    if (message.status === 'running') {
-      this.gatewayService.sendToMachine(
-        message.thread.machine_id,
-        'task:cancel',
-        { message_id: message.id },
-      );
-    }
+    // Send cancel to agent for both queued and running messages
+    // Agent handles: running → SIGTERM, queued → remove from queue
+    this.gatewayService.sendToMachine(
+      message.thread.machine_id,
+      'task:cancel',
+      { message_id: message.id },
+    );
 
     message.status = 'cancelled';
     message.completed_at = new Date();
