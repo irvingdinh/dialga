@@ -236,8 +236,9 @@ export const api = {
   },
 
   threads: {
-    list: (machineId: string) =>
-      request<
+    list: (machineId: string, params?: { status?: string }) => {
+      const query = params?.status ? `?status=${params.status}` : "";
+      return request<
         Array<{
           id: string;
           machine_id: string;
@@ -248,7 +249,8 @@ export const api = {
           created_at: string;
           updated_at: string;
         }>
-      >(`/api/machines/${machineId}/threads`),
+      >(`/api/machines/${machineId}/threads${query}`);
+    },
     create: (machineId: string, data?: { workspace_id?: string }) =>
       request<{
         id: string;
@@ -273,7 +275,7 @@ export const api = {
         created_at: string;
         updated_at: string;
       }>(`/api/threads/${threadId}`),
-    update: (threadId: string, data: { title?: string }) =>
+    update: (threadId: string, data: { title?: string; status?: string }) =>
       request<{
         id: string;
         machine_id: string;

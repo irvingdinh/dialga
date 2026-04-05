@@ -30,6 +30,10 @@ class UpdateThreadDto {
   @IsString()
   @IsOptional()
   title?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: 'active' | 'archived';
 }
 
 @Controller('api')
@@ -42,11 +46,13 @@ export class ThreadsController {
     @CurrentUser() user: User,
     @Param('machineId') machineId: string,
     @Query('workspace_id') workspaceId?: string,
+    @Query('status') status?: string,
   ) {
     const threads = await this.threadsService.list(
       machineId,
       user.id,
       workspaceId,
+      status,
     );
     return threads.map((t) => ({
       id: t.id,

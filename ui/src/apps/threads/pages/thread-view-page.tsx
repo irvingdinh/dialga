@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircleIcon,
+  ArchiveIcon,
+  ArchiveRestoreIcon,
   ArrowLeftIcon,
   MessageSquareIcon,
   PencilIcon,
@@ -239,6 +241,24 @@ export default function ThreadViewPage() {
     }
   }, [threadId, thread, queryClient, navigate]);
 
+  const handleToggleArchive = useCallback(async () => {
+    if (!threadId || !thread) return;
+    const newStatus = thread.status === "archived" ? "active" : "archived";
+    try {
+      await api.threads.update(threadId, { status: newStatus });
+      queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+      queryClient.invalidateQueries({
+        queryKey: ["threads", thread.machine_id],
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Failed to update thread status";
+      toast.error(message);
+    }
+  }, [threadId, thread, queryClient]);
+
   const handleSend = useCallback(
     async (content: string, model?: string) => {
       if (!threadId) return;
@@ -366,14 +386,33 @@ export default function ThreadViewPage() {
             )}
           </div>
           {!threadLoading && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setDeleteState("confirming")}
-              className="text-muted-foreground hover:text-destructive shrink-0"
-            >
-              <Trash2Icon className="size-4" />
-            </Button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleToggleArchive}
+                className="text-muted-foreground shrink-0"
+                title={
+                  thread?.status === "archived"
+                    ? "Unarchive thread"
+                    : "Archive thread"
+                }
+              >
+                {thread?.status === "archived" ? (
+                  <ArchiveRestoreIcon className="size-4" />
+                ) : (
+                  <ArchiveIcon className="size-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setDeleteState("confirming")}
+                className="text-muted-foreground hover:text-destructive shrink-0"
+              >
+                <Trash2Icon className="size-4" />
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -403,6 +442,26 @@ export default function ThreadViewPage() {
                 {deleteState === "deleting" ? "Deleting..." : "Delete"}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archived Banner */}
+      {thread?.status === "archived" && (
+        <div className="border-b px-4 py-2">
+          <div className="text-muted-foreground mx-auto flex max-w-lg items-center justify-between rounded-xl border px-3 py-2 text-xs">
+            <span className="flex items-center gap-2">
+              <ArchiveIcon className="size-3.5 shrink-0" />
+              This thread is archived.
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleArchive}
+              className="h-auto px-2 py-0.5 text-xs"
+            >
+              Unarchive
+            </Button>
           </div>
         </div>
       )}

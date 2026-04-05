@@ -35,10 +35,18 @@ export class ThreadsService {
     machineId: string,
     userId: string,
     workspaceId?: string,
+    status?: string,
   ): Promise<Thread[]> {
     await this.verifyMachineOwnership(machineId, userId);
     const where: Record<string, unknown> = { machine_id: machineId };
     if (workspaceId) where.workspace_id = workspaceId;
+    if (status === 'archived') {
+      where.status = 'archived';
+    } else if (status === 'all') {
+      // no filter — return both active and archived
+    } else {
+      where.status = 'active';
+    }
     return this.threadRepository.find({
       where,
       relations: ['workspace'],
@@ -73,10 +81,11 @@ export class ThreadsService {
   async update(
     id: string,
     userId: string,
-    data: { title?: string },
+    data: { title?: string; status?: 'active' | 'archived' },
   ): Promise<Thread> {
     const thread = await this.findOne(id, userId);
     if (data.title !== undefined) thread.title = data.title;
+    if (data.status !== undefined) thread.status = data.status;
     return this.threadRepository.save(thread);
   }
 

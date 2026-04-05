@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircleIcon,
+  ArchiveIcon,
+  ArchiveRestoreIcon,
   ArrowLeftIcon,
   FolderIcon,
   MessageSquareIcon,
@@ -60,6 +62,7 @@ export default function ThreadsPage() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [workspaceFilter, setWorkspaceFilter] = useState<string>("all");
+  const [showArchived, setShowArchived] = useState(false);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
   const { data: machine } = useQuery({
@@ -74,8 +77,11 @@ export default function ThreadsPage() {
     isLoading: threadsLoading,
     isError: threadsError,
   } = useQuery({
-    queryKey: ["threads", machineId],
-    queryFn: () => api.threads.list(machineId!),
+    queryKey: ["threads", machineId, showArchived ? "all" : "active"],
+    queryFn: () =>
+      api.threads.list(machineId!, {
+        status: showArchived ? "all" : "active",
+      }),
     enabled: !!machineId,
   });
 
@@ -158,6 +164,23 @@ export default function ThreadsPage() {
     [machineId, queryClient],
   );
 
+  const handleToggleArchive = useCallback(
+    async (threadId: string, currentStatus: string) => {
+      try {
+        const newStatus = currentStatus === "archived" ? "active" : "archived";
+        await api.threads.update(threadId, { status: newStatus });
+        queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
+      } catch (err) {
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : "Failed to update thread status";
+        toast.error(message);
+      }
+    },
+    [machineId, queryClient],
+  );
+
   const isOffline = machine?.status === "offline";
 
   return (
@@ -213,13 +236,13 @@ export default function ThreadsPage() {
         </div>
       )}
 
-      {/* Workspace Filter */}
-      {workspaces && workspaces.length > 0 && (
-        <div className="mt-4">
+      {/* Filters */}
+      <div className="mt-4 flex items-center gap-2">
+        {workspaces && workspaces.length > 0 && (
           <select
             value={workspaceFilter}
             onChange={(e) => setWorkspaceFilter(e.target.value)}
-            className="border-input bg-background text-foreground w-full rounded-xl border px-3 py-2 text-sm"
+            className="border-input bg-background text-foreground min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm"
           >
             <option value="all">All threads</option>
             <option value="none">No workspace</option>
@@ -229,8 +252,17 @@ export default function ThreadsPage() {
               </option>
             ))}
           </select>
-        </div>
-      )}
+        )}
+        <Button
+          variant={showArchived ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setShowArchived((v) => !v)}
+          className="shrink-0 gap-1.5"
+        >
+          <ArchiveIcon className="size-3.5" />
+          Archived
+        </Button>
+      </div>
 
       {/* Loading */}
       {threadsLoading && <ThreadListSkeleton />}
@@ -289,7 +321,9 @@ export default function ThreadsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="group hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors">
+                <div
+                  className={`group hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${thread.status === "archived" ? "opacity-60" : ""}`}
+                >
                   <button
                     onClick={() => navigate(`/threads/${thread.id}`)}
                     className="flex min-w-0 flex-1 items-start gap-3 text-left"
@@ -300,6 +334,17 @@ export default function ThreadsPage() {
                         {thread.title ?? "New thread"}
                       </div>
                       <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                        {thread.status === "archived" && (
+                          <>
+                            <Badge
+                              variant="outline"
+                              className="px-1.5 py-0 text-[10px]"
+                            >
+                              archived
+                            </Badge>
+                            <span>·</span>
+                          </>
+                        )}
                         {thread.workspace_name && (
                           <>
                             <span className="flex items-center gap-1">
@@ -312,24 +357,36 @@ export default function ThreadsPage() {
                         <span>{timeAgo(thread.updated_at)}</span>
                       </div>
                     </div>
-                    <Badge
-                      variant={
-                        thread.status === "active" ? "secondary" : "outline"
+                  </button>
+                  <div className="mt-0.5 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleArchive(thread.id, thread.status);
+                      }}
+                      className="text-muted-foreground/40 hover:text-foreground"
+                      title={
+                        thread.status === "archived"
+                          ? "Unarchive thread"
+                          : "Archive thread"
                       }
-                      className="mt-0.5 shrink-0"
                     >
-                      {thread.status}
-                    </Badge>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeletingThreadId(thread.id);
-                    }}
-                    className="text-muted-foreground/40 hover:text-destructive mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100"
-                  >
-                    <Trash2Icon className="size-4" />
-                  </button>
+                      {thread.status === "archived" ? (
+                        <ArchiveRestoreIcon className="size-4" />
+                      ) : (
+                        <ArchiveIcon className="size-4" />
+                      )}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingThreadId(thread.id);
+                      }}
+                      className="text-muted-foreground/40 hover:text-destructive"
+                    >
+                      <Trash2Icon className="size-4" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
