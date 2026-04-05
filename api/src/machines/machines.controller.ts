@@ -149,4 +149,40 @@ export class MachinesController {
     await this.machinesService.findOne(machineId, user.id);
     return this.gatewayService.fsReadFile(machineId, filePath || '/');
   }
+
+  @Get(':machineId/git/status')
+  async gitStatus(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Query('path') dirPath: string,
+  ) {
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.gitStatus(machineId, dirPath);
+  }
+
+  @Get(':machineId/git/diff')
+  async gitDiff(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Query('path') dirPath: string,
+    @Query('file') file?: string,
+  ) {
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.gitDiff(machineId, dirPath, file);
+  }
+
+  @Get(':machineId/git/log')
+  async gitLog(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Query('path') dirPath: string,
+    @Query('limit') limit?: string,
+  ) {
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.gitLog(
+      machineId,
+      dirPath,
+      limit ? parseInt(limit, 10) : undefined,
+    );
+  }
 }

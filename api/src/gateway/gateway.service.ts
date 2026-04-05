@@ -455,6 +455,82 @@ export class GatewayService {
     };
   }
 
+  // --- Git Operations ---
+
+  async gitStatus(
+    machineId: string,
+    dirPath: string,
+  ): Promise<{
+    root?: string;
+    branch?: string;
+    files?: Array<{ status: string; path: string; staged: boolean }>;
+    error?: string;
+  }> {
+    const result = (await this.sendRequest(machineId, 'git:status', {
+      path: dirPath,
+    })) as {
+      request_id: string;
+      root?: string;
+      branch?: string;
+      files?: Array<{ status: string; path: string; staged: boolean }>;
+      error?: string;
+    };
+    return {
+      root: result.root,
+      branch: result.branch,
+      files: result.files,
+      error: result.error,
+    };
+  }
+
+  async gitDiff(
+    machineId: string,
+    dirPath: string,
+    file?: string,
+  ): Promise<{ diff: string; file?: string | null; error?: string }> {
+    const result = (await this.sendRequest(machineId, 'git:diff', {
+      path: dirPath,
+      file,
+    })) as {
+      request_id: string;
+      diff: string;
+      file?: string | null;
+      error?: string;
+    };
+    return { diff: result.diff, file: result.file, error: result.error };
+  }
+
+  async gitLog(
+    machineId: string,
+    dirPath: string,
+    limit?: number,
+  ): Promise<{
+    entries: Array<{
+      hash: string;
+      short_hash: string;
+      author: string;
+      date: string;
+      message: string;
+    }>;
+    error?: string;
+  }> {
+    const result = (await this.sendRequest(machineId, 'git:log', {
+      path: dirPath,
+      limit,
+    })) as {
+      request_id: string;
+      entries: Array<{
+        hash: string;
+        short_hash: string;
+        author: string;
+        date: string;
+        message: string;
+      }>;
+      error?: string;
+    };
+    return { entries: result.entries, error: result.error };
+  }
+
   async dispatchQueuedMessages(machineId: string): Promise<void> {
     // Find all queued assistant messages for threads on this machine
     const queuedMessages = await this.messageRepository

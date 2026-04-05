@@ -13,6 +13,7 @@ import {
   DownloadIcon,
   FolderIcon,
   FolderOpenIcon,
+  GitBranchIcon,
   LoaderIcon,
   MessageSquareIcon,
   PencilIcon,
@@ -26,6 +27,7 @@ import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { FileBrowser } from "@/apps/threads/components/file-browser";
+import { GitPanel } from "@/apps/threads/components/git-panel";
 import { MessageInput } from "@/apps/threads/components/message-input";
 import {
   MessageItem,
@@ -89,6 +91,9 @@ export default function ThreadViewPage() {
 
   // File browser state
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
+
+  // Git panel state
+  const [isGitPanelOpen, setIsGitPanelOpen] = useState(false);
 
   // Workspace selector state
   const [isWorkspaceSelectorOpen, setIsWorkspaceSelectorOpen] = useState(false);
@@ -560,15 +565,32 @@ export default function ThreadViewPage() {
           {!threadLoading && (
             <div className="flex shrink-0 items-center gap-0.5">
               {thread?.working_directory && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setIsFileBrowserOpen((v) => !v)}
-                  className={`shrink-0 ${isFileBrowserOpen ? "text-foreground" : "text-muted-foreground"}`}
-                  title="Browse workspace files"
-                >
-                  <FolderOpenIcon className="size-4" />
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => {
+                      setIsFileBrowserOpen((v) => !v);
+                      setIsGitPanelOpen(false);
+                    }}
+                    className={`shrink-0 ${isFileBrowserOpen ? "text-foreground" : "text-muted-foreground"}`}
+                    title="Browse workspace files"
+                  >
+                    <FolderOpenIcon className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => {
+                      setIsGitPanelOpen((v) => !v);
+                      setIsFileBrowserOpen(false);
+                    }}
+                    className={`shrink-0 ${isGitPanelOpen ? "text-foreground" : "text-muted-foreground"}`}
+                    title="Git changes"
+                  >
+                    <GitBranchIcon className="size-4" />
+                  </Button>
+                </>
               )}
               <Button
                 variant="ghost"
@@ -724,10 +746,23 @@ export default function ThreadViewPage() {
         </div>
       )}
 
+      {/* Git Panel */}
+      {isGitPanelOpen && thread?.machine_id && thread?.working_directory && (
+        <div className="flex-1 overflow-hidden border-b">
+          <div className="mx-auto h-full max-w-lg">
+            <GitPanel
+              machineId={thread.machine_id}
+              workingDirectory={thread.working_directory}
+              onClose={() => setIsGitPanelOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 overflow-y-auto ${isFileBrowserOpen ? "hidden" : ""}`}
+        className={`flex-1 overflow-y-auto ${isFileBrowserOpen || isGitPanelOpen ? "hidden" : ""}`}
       >
         <div className="mx-auto max-w-lg">
           {/* Loading */}
@@ -859,6 +894,7 @@ export default function ThreadViewPage() {
           onOpenChange={setIsWorkspaceSelectorOpen}
           onChanged={() => {
             setIsFileBrowserOpen(false);
+            setIsGitPanelOpen(false);
             queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
             queryClient.invalidateQueries({
               queryKey: ["threads", thread.machine_id],
