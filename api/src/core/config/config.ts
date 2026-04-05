@@ -4,11 +4,7 @@ export interface AppConfig {
     port: number;
   };
   database: {
-    host: string;
-    port: number;
-    username: string;
-    password: string;
-    name: string;
+    url: string;
   };
   redis: {
     url?: string;
@@ -31,11 +27,7 @@ export const config = (): { root: AppConfig } => ({
       port: parseInt(process.env.PORT || '48310', 10),
     },
     database: {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '3306', 10),
-      username: process.env.DB_USERNAME || 'root',
-      password: process.env.DB_PASSWORD || '',
-      name: process.env.DB_NAME || 'dialga',
+      url: process.env.MYSQL_URL || 'mysql://root@localhost:3306/dialga',
     },
     redis: {
       url: process.env.REDIS_URL || undefined,

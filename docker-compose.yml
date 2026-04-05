@@ -8,11 +8,7 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: "48310"
-      DB_HOST: mysql
-      DB_PORT: "3306"
-      DB_USERNAME: root
-      DB_PASSWORD: dialga
-      DB_NAME: dialga
+      MYSQL_URL: mysql://root:dialga@mysql:3306/dialga
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       JWT_SECRET: dialga-dev-secret

@@ -11,11 +11,7 @@ export const typeormForRoot = TypeOrmModule.forRootAsync({
 
     return {
       type: 'mysql',
-      host: config.database.host,
-      port: config.database.port,
-      username: config.database.username,
-      password: config.database.password,
-      database: config.database.name,
+      url: config.database.url,
       entities: [...entities],
       synchronize: true,
     };
