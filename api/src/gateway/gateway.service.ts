@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import type { WebSocket } from 'ws';
 
 import { Machine, Message, Thread } from '../core/entities/index.js';
+import { StreamingService } from '../streaming/streaming.service.js';
 
 interface ConnectedMachine {
   machineId: string;
@@ -27,6 +28,7 @@ export class GatewayService {
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(Thread)
     private readonly threadRepository: Repository<Thread>,
+    private readonly streamingService: StreamingService,
   ) {}
 
   onModuleInit() {
@@ -69,12 +71,16 @@ export class GatewayService {
     });
     this.machineToSocket.set(machineId, socket);
 
+    const now = new Date();
     await this.machineRepository.update(machineId, {
       status: 'online',
-      last_seen_at: new Date(),
+      last_seen_at: now,
     });
 
     this.logger.log(`Machine ${machineId} connected`);
+
+    // Broadcast machine status change via SSE
+    await this.streamingService.publishMachineStatus(machineId, 'online', now);
   }
 
   async handleDisconnect(socket: WebSocket): Promise<void> {
@@ -84,12 +90,20 @@ export class GatewayService {
     this.connections.delete(socket);
     this.machineToSocket.delete(conn.machineId);
 
+    const now = new Date();
     await this.machineRepository.update(conn.machineId, {
       status: 'offline',
-      last_seen_at: new Date(),
+      last_seen_at: now,
     });
 
     this.logger.log(`Machine ${conn.machineId} disconnected`);
+
+    // Broadcast machine status change via SSE
+    await this.streamingService.publishMachineStatus(
+      conn.machineId,
+      'offline',
+      now,
+    );
   }
 
   handleHeartbeat(socket: WebSocket): void {
@@ -217,6 +231,13 @@ export class GatewayService {
       assistantMessage.status = 'running';
       assistantMessage.started_at = new Date();
       await this.messageRepository.save(assistantMessage);
+
+      // Notify SSE subscribers that message status changed to running
+      await this.streamingService.publishMessageStatus(
+        assistantMessage.thread_id,
+        assistantMessage.id,
+        'running',
+      );
     }
 
     return sent;
@@ -237,9 +258,12 @@ export class GatewayService {
     });
     if (!message || message.thread.machine_id !== machineId) return;
 
-    // TODO: Phase 4 — emit via Redis Pub/Sub → SSE for live streaming
-    this.logger.debug(
-      `task:output [${data.type}] for message ${data.message_id}`,
+    // Fan out via Redis Pub/Sub → SSE
+    await this.streamingService.publishMessageDelta(
+      message.thread_id,
+      data.message_id,
+      data.type,
+      data.content,
     );
   }
 
@@ -266,6 +290,24 @@ export class GatewayService {
 
     this.logger.log(
       `Task complete: message ${data.message_id} → ${data.status}`,
+    );
+
+    // Fan out completion via Redis → SSE
+    await this.streamingService.publishMessageComplete(
+      message.thread_id,
+      data.message_id,
+      data.status,
+      data.summary,
+      data.metadata,
+    );
+
+    // Also notify thread list that this thread has new activity
+    await this.streamingService.publishThreadUpdate(
+      machineId,
+      message.thread_id,
+      (data.summary || '').slice(0, 100),
+      data.status,
+      message.completed_at,
     );
   }
 

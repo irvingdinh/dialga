@@ -10,6 +10,10 @@ export interface AppConfig {
     password: string;
     name: string;
   };
+  redis: {
+    host: string;
+    port: number;
+  };
   jwt: {
     secret: string;
     accessTokenExpirySeconds: number;
@@ -29,6 +33,10 @@ export const config = (): { root: AppConfig } => ({
       username: process.env.DB_USERNAME || 'root',
       password: process.env.DB_PASSWORD || '',
       name: process.env.DB_NAME || 'dialga',
+    },
+    redis: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
     },
     jwt: {
       secret:

@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 
 import { Machine, Message, Thread } from '../core/entities/index.js';
 import { GatewayService } from '../gateway/gateway.service.js';
+import { StreamingService } from '../streaming/streaming.service.js';
 
 @Injectable()
 export class MessagesService {
@@ -23,6 +24,7 @@ export class MessagesService {
     @InjectRepository(Machine)
     private readonly machineRepository: Repository<Machine>,
     private readonly gatewayService: GatewayService,
+    private readonly streamingService: StreamingService,
   ) {}
 
   async verifyThreadBelongsToMachine(
@@ -108,6 +110,15 @@ export class MessagesService {
       );
     }
 
+    // Notify thread list about new activity
+    await this.streamingService.publishThreadUpdate(
+      thread.machine_id,
+      threadId,
+      data.content.slice(0, 100),
+      'active',
+      thread.updated_at,
+    );
+
     return { userMessage, assistantMessage };
   }
 
@@ -137,7 +148,16 @@ export class MessagesService {
 
     message.status = 'cancelled';
     message.completed_at = new Date();
-    return this.messageRepository.save(message);
+    const saved = await this.messageRepository.save(message);
+
+    // Notify SSE subscribers about cancellation
+    await this.streamingService.publishMessageStatus(
+      message.thread_id,
+      message.id,
+      'cancelled',
+    );
+
+    return saved;
   }
 
   async getAsJsonl(threadId: string): Promise<string> {
