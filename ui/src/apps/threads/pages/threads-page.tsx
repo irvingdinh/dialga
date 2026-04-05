@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertCircleIcon,
   ArrowLeftIcon,
   FolderIcon,
   MessageSquareIcon,
@@ -13,6 +14,7 @@ import { useNavigate, useParams } from "react-router";
 import { CreateThreadDialog } from "@/apps/threads/components/create-thread-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 
 function timeAgo(dateStr: string): string {
@@ -30,6 +32,26 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
+function ThreadListSkeleton() {
+  return (
+    <div className="mt-4 flex flex-col gap-2">
+      {[1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="flex items-start gap-3 rounded-2xl border px-4 py-3"
+        >
+          <Skeleton className="mt-0.5 size-4 rounded" />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="mt-1.5 h-3 w-24" />
+          </div>
+          <Skeleton className="mt-0.5 h-5 w-12 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ThreadsPage() {
   const { machineId } = useParams<{ machineId: string }>();
   const navigate = useNavigate();
@@ -43,7 +65,12 @@ export default function ThreadsPage() {
     enabled: !!machineId,
   });
 
-  const { data: threads, refetch } = useQuery({
+  const {
+    data: threads,
+    refetch,
+    isLoading: threadsLoading,
+    isError: threadsError,
+  } = useQuery({
     queryKey: ["threads", machineId],
     queryFn: () => api.threads.list(machineId!),
     enabled: !!machineId,
@@ -187,49 +214,72 @@ export default function ThreadsPage() {
         </div>
       )}
 
-      {/* Thread List */}
-      <div className="mt-4 flex flex-col gap-2">
-        {filteredThreads.length === 0 && threads !== undefined && (
-          <div className="text-muted-foreground flex flex-col items-center py-16 text-center text-sm">
-            <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
-            <p>No threads yet.</p>
-            <p className="mt-1">Start a conversation with your machine.</p>
-          </div>
-        )}
+      {/* Loading */}
+      {threadsLoading && <ThreadListSkeleton />}
 
-        {filteredThreads.map((thread) => (
-          <button
-            key={thread.id}
-            onClick={() => navigate(`/threads/${thread.id}`)}
-            className="hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors"
+      {/* Error */}
+      {threadsError && (
+        <div className="mt-4 flex flex-col items-center py-16 text-center">
+          <AlertCircleIcon className="text-muted-foreground/40 mb-3 size-8" />
+          <p className="text-muted-foreground text-sm">
+            Failed to load threads.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => refetch()}
           >
-            <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">
-                {thread.title ?? "New thread"}
-              </div>
-              <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
-                {thread.workspace_name && (
-                  <>
-                    <span className="flex items-center gap-1">
-                      <FolderIcon className="size-3" />
-                      {thread.workspace_name}
-                    </span>
-                    <span>·</span>
-                  </>
-                )}
-                <span>{timeAgo(thread.updated_at)}</span>
-              </div>
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Thread List */}
+      {threads && (
+        <div className="mt-4 flex flex-col gap-2">
+          {filteredThreads.length === 0 && (
+            <div className="text-muted-foreground flex flex-col items-center py-16 text-center text-sm">
+              <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
+              <p>No threads yet.</p>
+              <p className="mt-1">Start a conversation with your machine.</p>
             </div>
-            <Badge
-              variant={thread.status === "active" ? "secondary" : "outline"}
-              className="mt-0.5 shrink-0"
+          )}
+
+          {filteredThreads.map((thread) => (
+            <button
+              key={thread.id}
+              onClick={() => navigate(`/threads/${thread.id}`)}
+              className="hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors"
             >
-              {thread.status}
-            </Badge>
-          </button>
-        ))}
-      </div>
+              <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">
+                  {thread.title ?? "New thread"}
+                </div>
+                <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                  {thread.workspace_name && (
+                    <>
+                      <span className="flex items-center gap-1">
+                        <FolderIcon className="size-3" />
+                        {thread.workspace_name}
+                      </span>
+                      <span>·</span>
+                    </>
+                  )}
+                  <span>{timeAgo(thread.updated_at)}</span>
+                </div>
+              </div>
+              <Badge
+                variant={thread.status === "active" ? "secondary" : "outline"}
+                className="mt-0.5 shrink-0"
+              >
+                {thread.status}
+              </Badge>
+            </button>
+          ))}
+        </div>
+      )}
 
       <CreateThreadDialog
         machineId={machineId!}

@@ -1,7 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftIcon, PencilIcon, WifiOffIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  ArrowLeftIcon,
+  MessageSquareIcon,
+  PencilIcon,
+  WifiOffIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 
 import { MessageInput } from "@/apps/threads/components/message-input";
 import {
@@ -9,7 +16,33 @@ import {
   type StreamEvent,
 } from "@/apps/threads/components/message-item";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { Skeleton } from "@/components/ui/skeleton";
+import { api, ApiError } from "@/lib/api";
+
+function ThreadViewSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 px-4 py-4">
+      {/* User message skeleton */}
+      <div className="flex gap-3">
+        <Skeleton className="size-7 shrink-0 rounded-full" />
+        <div className="flex-1">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="mt-2 h-4 w-64" />
+        </div>
+      </div>
+      {/* Assistant message skeleton */}
+      <div className="flex gap-3">
+        <Skeleton className="size-7 shrink-0 rounded-full" />
+        <div className="flex-1">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="mt-2 h-4 w-full max-w-80" />
+          <Skeleton className="mt-1.5 h-4 w-full max-w-72" />
+          <Skeleton className="mt-1.5 h-4 w-48" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ThreadViewPage() {
   const { threadId } = useParams<{ threadId: string }>();
@@ -31,7 +64,11 @@ export default function ThreadViewPage() {
   );
   const [machineStatus, setMachineStatus] = useState<string | null>(null);
 
-  const { data: thread } = useQuery({
+  const {
+    data: thread,
+    isLoading: threadLoading,
+    isError: threadError,
+  } = useQuery({
     queryKey: ["thread", threadId],
     queryFn: () => api.threads.get(threadId!),
     enabled: !!threadId,
@@ -43,7 +80,12 @@ export default function ThreadViewPage() {
     enabled: !!thread?.machine_id,
   });
 
-  const { data: messages } = useQuery({
+  const {
+    data: messages,
+    isLoading: messagesLoading,
+    isError: messagesError,
+    refetch: refetchMessages,
+  } = useQuery({
     queryKey: ["messages", threadId],
     queryFn: () => api.messages.list(threadId!),
     enabled: !!threadId,
@@ -212,8 +254,10 @@ export default function ThreadViewPage() {
         );
         // Also update thread title if it was empty
         queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
-      } catch {
-        // TODO: show error toast
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : "Failed to send message";
+        toast.error(message);
       }
     },
     [threadId, queryClient],
@@ -230,8 +274,10 @@ export default function ThreadViewPage() {
           return next;
         });
         queryClient.invalidateQueries({ queryKey: ["messages", threadId] });
-      } catch {
-        // ignore
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : "Failed to cancel";
+        toast.error(message);
       }
     },
     [threadId, queryClient],
@@ -240,6 +286,9 @@ export default function ThreadViewPage() {
   const isOffline =
     machineStatus === "offline" ||
     (!machineStatus && machine?.status === "offline");
+
+  const isPageLoading = threadLoading || messagesLoading;
+  const isPageError = threadError || messagesError;
 
   return (
     <div className="flex h-screen flex-col">
@@ -260,7 +309,9 @@ export default function ThreadViewPage() {
             <ArrowLeftIcon className="size-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            {isEditingTitle ? (
+            {threadLoading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : isEditingTitle ? (
               <input
                 ref={titleInputRef}
                 type="text"
@@ -308,26 +359,62 @@ export default function ThreadViewPage() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-lg px-4 py-4">
-          <div className="flex flex-col gap-6">
-            {messages?.map((msg) => (
-              <MessageItem
-                key={msg.id}
-                message={msg}
-                streamEvents={streamingEvents.get(msg.id)}
-                overrideStatus={messageStatuses.get(msg.id)}
-                onCancel={
-                  msg.role === "assistant" &&
-                  (messageStatuses.get(msg.id) ?? msg.status) !== "completed" &&
-                  (messageStatuses.get(msg.id) ?? msg.status) !== "cancelled" &&
-                  (messageStatuses.get(msg.id) ?? msg.status) !== "error" &&
-                  (messageStatuses.get(msg.id) ?? msg.status) !== "timed_out"
-                    ? () => handleCancel(msg.id)
-                    : undefined
-                }
-              />
-            ))}
-          </div>
+        <div className="mx-auto max-w-lg">
+          {/* Loading */}
+          {isPageLoading && <ThreadViewSkeleton />}
+
+          {/* Error */}
+          {isPageError && !isPageLoading && (
+            <div className="flex flex-col items-center px-4 py-16 text-center">
+              <AlertCircleIcon className="text-muted-foreground/40 mb-3 size-8" />
+              <p className="text-muted-foreground text-sm">
+                Failed to load thread.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => refetchMessages()}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {messages && messages.length === 0 && !isPageLoading && (
+            <div className="flex flex-col items-center px-4 py-16 text-center">
+              <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
+              <p className="text-muted-foreground text-sm">
+                No messages yet. Send one to get started.
+              </p>
+            </div>
+          )}
+
+          {/* Message list */}
+          {messages && messages.length > 0 && (
+            <div className="flex flex-col gap-6 px-4 py-4">
+              {messages.map((msg) => (
+                <MessageItem
+                  key={msg.id}
+                  message={msg}
+                  streamEvents={streamingEvents.get(msg.id)}
+                  overrideStatus={messageStatuses.get(msg.id)}
+                  onCancel={
+                    msg.role === "assistant" &&
+                    (messageStatuses.get(msg.id) ?? msg.status) !==
+                      "completed" &&
+                    (messageStatuses.get(msg.id) ?? msg.status) !==
+                      "cancelled" &&
+                    (messageStatuses.get(msg.id) ?? msg.status) !== "error" &&
+                    (messageStatuses.get(msg.id) ?? msg.status) !== "timed_out"
+                      ? () => handleCancel(msg.id)
+                      : undefined
+                  }
+                />
+              ))}
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
       </div>
