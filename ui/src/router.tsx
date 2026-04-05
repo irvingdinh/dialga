@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import { ProtectedRoute } from "@/apps/auth/protected-route";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { NotificationListener } from "@/lib/notifications";
 
 const LoginPage = lazy(() => import("./apps/auth/pages/login-page"));
 const MachinesPage = lazy(() => import("./apps/machines/pages/machines-page"));
@@ -17,6 +18,7 @@ const ThreadViewPage = lazy(
 export const Router = () => {
   return (
     <BrowserRouter>
+      <NotificationListener />
       <Suspense>
         <Routes>
           <Route

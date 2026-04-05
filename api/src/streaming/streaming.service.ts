@@ -124,6 +124,33 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
     return `machine:${machineId}:threads`;
   }
 
+  // User notifications: task:notification
+  userNotificationsChannel(userId: string): string {
+    return `user:${userId}:notifications`;
+  }
+
+  async publishNotification(
+    userId: string,
+    data: {
+      type:
+        | 'task_completed'
+        | 'task_error'
+        | 'task_timed_out'
+        | 'task_cancelled';
+      thread_id: string;
+      thread_title: string | null;
+      machine_name: string;
+      message_id: string;
+      summary?: string;
+    },
+  ): Promise<void> {
+    await this.publish(
+      this.userNotificationsChannel(userId),
+      'task:notification',
+      data as unknown as Record<string, unknown>,
+    );
+  }
+
   // Convenience publish methods
   async publishMessageDelta(
     threadId: string,

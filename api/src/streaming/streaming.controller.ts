@@ -1,6 +1,8 @@
 import { Controller, Param, Sse, UseGuards } from '@nestjs/common';
 import { Observable } from 'rxjs';
 
+import { CurrentUser } from '../core/decorators/current-user.decorator.js';
+import { User } from '../core/entities/index.js';
 import { AuthGuard } from '../core/guards/auth.guard.js';
 import { StreamingService } from './streaming.service.js';
 
@@ -29,6 +31,13 @@ export class StreamingController {
   ): Observable<MessageEvent> {
     return this.streamingService.subscribe(
       this.streamingService.machineThreadsChannel(machineId),
+    );
+  }
+
+  @Sse('notifications/stream')
+  notificationsStream(@CurrentUser() user: User): Observable<MessageEvent> {
+    return this.streamingService.subscribe(
+      this.streamingService.userNotificationsChannel(user.id),
     );
   }
 }

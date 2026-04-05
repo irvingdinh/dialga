@@ -344,6 +344,55 @@ export class GatewayService {
       data.status,
       message.completed_at,
     );
+
+    // Publish user-level notification for global toast
+    await this.publishUserNotification(
+      machineId,
+      message,
+      data.status,
+      data.summary,
+    );
+  }
+
+  private async publishUserNotification(
+    machineId: string,
+    message: Message,
+    status: string,
+    summary?: string,
+  ): Promise<void> {
+    try {
+      const machine = await this.machineRepository.findOne({
+        where: { id: machineId },
+      });
+      if (!machine) return;
+
+      const thread = await this.threadRepository.findOne({
+        where: { id: message.thread_id },
+      });
+      if (!thread) return;
+
+      const typeMap: Record<string, string> = {
+        completed: 'task_completed',
+        error: 'task_error',
+        timed_out: 'task_timed_out',
+        cancelled: 'task_cancelled',
+      };
+
+      await this.streamingService.publishNotification(machine.user_id, {
+        type: (typeMap[status] || 'task_completed') as
+          | 'task_completed'
+          | 'task_error'
+          | 'task_timed_out'
+          | 'task_cancelled',
+        thread_id: thread.id,
+        thread_title: thread.title,
+        machine_name: machine.name,
+        message_id: message.id,
+        summary: summary?.slice(0, 200),
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to publish user notification: ${err}`);
+    }
   }
 
   handleHealthReport(machineId: string, data: Record<string, unknown>): void {
