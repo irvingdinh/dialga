@@ -109,6 +109,52 @@ export const api = {
       >(`/api/machines/${machineId}/workspaces`),
   },
 
+  messages: {
+    list: (threadId: string) =>
+      request<
+        Array<{
+          id: string;
+          thread_id: string;
+          role: "user" | "assistant" | "system";
+          content: string;
+          model: string | null;
+          status: string;
+          metadata: Record<string, unknown> | null;
+          started_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+        }>
+      >(`/api/threads/${threadId}/messages`),
+    send: (threadId: string, data: { content: string; model?: string }) =>
+      request<{
+        user_message: {
+          id: string;
+          thread_id: string;
+          role: string;
+          content: string;
+          status: string;
+          created_at: string;
+        };
+        assistant_message: {
+          id: string;
+          thread_id: string;
+          role: string;
+          content: string;
+          model: string | null;
+          status: string;
+          created_at: string;
+        };
+      }>(`/api/threads/${threadId}/messages`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    cancel: (messageId: string) =>
+      request<{ id: string; status: string; completed_at: string }>(
+        `/api/messages/${messageId}/cancel`,
+        { method: "POST" },
+      ),
+  },
+
   threads: {
     list: (machineId: string) =>
       request<
