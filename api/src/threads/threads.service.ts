@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Machine, Message, Thread } from '../core/entities/index.js';
+import { Machine, Message, Thread, Workspace } from '../core/entities/index.js';
 
 @Injectable()
 export class ThreadsService {
@@ -17,6 +18,8 @@ export class ThreadsService {
     private readonly machineRepository: Repository<Machine>,
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
+    @InjectRepository(Workspace)
+    private readonly workspaceRepository: Repository<Workspace>,
   ) {}
 
   private async verifyMachineOwnership(
@@ -176,11 +179,32 @@ export class ThreadsService {
   async update(
     id: string,
     userId: string,
-    data: { title?: string; status?: 'active' | 'archived' },
+    data: {
+      title?: string;
+      status?: 'active' | 'archived';
+      workspace_id?: string | null;
+    },
   ): Promise<Thread> {
     const thread = await this.findOne(id, userId);
     if (data.title !== undefined) thread.title = data.title;
     if (data.status !== undefined) thread.status = data.status;
+    if (data.workspace_id !== undefined) {
+      if (data.workspace_id === null) {
+        thread.workspace_id = null;
+        thread.workspace = null;
+      } else {
+        const workspace = await this.workspaceRepository.findOne({
+          where: { id: data.workspace_id },
+        });
+        if (!workspace) throw new NotFoundException('Workspace not found');
+        if (workspace.machine_id !== thread.machine_id)
+          throw new BadRequestException(
+            'Workspace must belong to the same machine',
+          );
+        thread.workspace_id = workspace.id;
+        thread.workspace = workspace;
+      }
+    }
     return this.threadRepository.save(thread);
   }
 

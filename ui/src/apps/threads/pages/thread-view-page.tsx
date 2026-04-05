@@ -10,6 +10,7 @@ import {
   ArchiveRestoreIcon,
   ArrowLeftIcon,
   ChevronUpIcon,
+  FolderIcon,
   FolderOpenIcon,
   LoaderIcon,
   MessageSquareIcon,
@@ -29,6 +30,7 @@ import {
   MessageItem,
   type StreamEvent,
 } from "@/apps/threads/components/message-item";
+import { WorkspaceSelector } from "@/apps/threads/components/workspace-selector";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
@@ -86,6 +88,9 @@ export default function ThreadViewPage() {
 
   // File browser state
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
+
+  // Workspace selector state
+  const [isWorkspaceSelectorOpen, setIsWorkspaceSelectorOpen] = useState(false);
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -527,10 +532,17 @@ export default function ThreadViewPage() {
                 <PencilIcon className="text-muted-foreground size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
               </button>
             )}
-            {thread?.workspace_name && (
-              <p className="text-muted-foreground truncate text-[11px]">
-                {thread.workspace_name}
-              </p>
+            {!threadLoading && (
+              <button
+                type="button"
+                onClick={() => setIsWorkspaceSelectorOpen(true)}
+                className="text-muted-foreground group flex max-w-full items-center gap-1 truncate text-[11px] hover:underline"
+              >
+                <FolderIcon className="size-2.5 shrink-0" />
+                <span className="truncate">
+                  {thread?.workspace_name ?? "No workspace"}
+                </span>
+              </button>
             )}
           </div>
           {!threadLoading && (
@@ -815,6 +827,24 @@ export default function ThreadViewPage() {
 
       {/* Input */}
       <MessageInput onSend={handleSend} />
+
+      {/* Workspace Selector Dialog */}
+      {thread && (
+        <WorkspaceSelector
+          machineId={thread.machine_id}
+          threadId={thread.id}
+          currentWorkspaceId={thread.workspace_id}
+          open={isWorkspaceSelectorOpen}
+          onOpenChange={setIsWorkspaceSelectorOpen}
+          onChanged={() => {
+            setIsFileBrowserOpen(false);
+            queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+            queryClient.invalidateQueries({
+              queryKey: ["threads", thread.machine_id],
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

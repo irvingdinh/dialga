@@ -34,6 +34,9 @@ class UpdateThreadDto {
   @IsString()
   @IsOptional()
   status?: 'active' | 'archived';
+
+  @IsOptional()
+  workspace_id?: string | null;
 }
 
 @Controller('api')
@@ -121,6 +124,7 @@ export class ThreadsController {
       machine_id: t.machine_id,
       workspace_id: t.workspace_id,
       workspace_name: t.workspace?.name || null,
+      working_directory: t.workspace?.working_directory || null,
       title: t.title,
       status: t.status,
       created_at: t.created_at,
