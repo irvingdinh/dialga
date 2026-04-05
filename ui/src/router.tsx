@@ -5,6 +5,10 @@ import { ProtectedRoute } from "@/apps/auth/protected-route";
 
 const LoginPage = lazy(() => import("./apps/auth/pages/login-page"));
 const MachinesPage = lazy(() => import("./apps/machines/pages/machines-page"));
+const ThreadsPage = lazy(() => import("./apps/threads/pages/threads-page"));
+const ThreadViewPage = lazy(
+  () => import("./apps/threads/pages/thread-view-page"),
+);
 
 export const Router = () => {
   return (
@@ -17,6 +21,22 @@ export const Router = () => {
             element={
               <ProtectedRoute>
                 <MachinesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/machines/:machineId/threads"
+            element={
+              <ProtectedRoute>
+                <ThreadsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/threads/:threadId"
+            element={
+              <ProtectedRoute>
+                <ThreadViewPage />
               </ProtectedRoute>
             }
           />

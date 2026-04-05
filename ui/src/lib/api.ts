@@ -92,4 +92,60 @@ export const api = {
         method: "POST",
       }),
   },
+
+  workspaces: {
+    list: (machineId: string) =>
+      request<
+        Array<{
+          id: string;
+          machine_id: string;
+          name: string;
+          working_directory: string;
+          custom_instruction: string | null;
+          agent: string | null;
+          model: string | null;
+          created_at: string;
+        }>
+      >(`/api/machines/${machineId}/workspaces`),
+  },
+
+  threads: {
+    list: (machineId: string) =>
+      request<
+        Array<{
+          id: string;
+          machine_id: string;
+          workspace_id: string | null;
+          workspace_name: string | null;
+          title: string | null;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        }>
+      >(`/api/machines/${machineId}/threads`),
+    create: (machineId: string, data?: { workspace_id?: string }) =>
+      request<{
+        id: string;
+        machine_id: string;
+        workspace_id: string | null;
+        title: string | null;
+        status: string;
+        created_at: string;
+        updated_at: string;
+      }>(`/api/machines/${machineId}/threads`, {
+        method: "POST",
+        body: JSON.stringify(data ?? {}),
+      }),
+    get: (threadId: string) =>
+      request<{
+        id: string;
+        machine_id: string;
+        workspace_id: string | null;
+        workspace_name: string | null;
+        title: string | null;
+        status: string;
+        created_at: string;
+        updated_at: string;
+      }>(`/api/threads/${threadId}`),
+  },
 };
