@@ -7,7 +7,11 @@ import {
   codeToHtml,
 } from "shiki";
 
-const THEME: BundledTheme = "github-light";
+import { useTheme } from "@/lib/theme";
+
+function getShikiTheme(resolved: "light" | "dark"): BundledTheme {
+  return resolved === "dark" ? "github-dark" : "github-light";
+}
 
 // Only resolve languages that shiki actually supports
 function resolveLanguage(lang: string | undefined): BundledLanguage | null {
@@ -48,22 +52,24 @@ export function CodeBlock({
   const [html, setHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const { resolved } = useTheme();
 
   const code = children.replace(/\n$/, "");
   const lang = resolveLanguage(language);
+  const theme = getShikiTheme(resolved);
 
   useEffect(() => {
     if (!lang) return;
     let cancelled = false;
 
-    codeToHtml(code, { lang, theme: THEME }).then((result) => {
+    codeToHtml(code, { lang, theme }).then((result) => {
       if (!cancelled) setHtml(result);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [code, lang]);
+  }, [code, lang, theme]);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(code);

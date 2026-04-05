@@ -456,8 +456,8 @@ function DeleteMachineButton({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
-      <p className="text-sm text-red-800">
+    <div className="flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/30">
+      <p className="text-sm text-red-800 dark:text-red-400">
         This will delete the machine and all its threads. This cannot be undone.
       </p>
       <div className="flex gap-2">

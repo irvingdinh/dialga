@@ -205,7 +205,7 @@ export default function ThreadsPage() {
 
       {/* Offline Banner */}
       {isOffline && (
-        <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+        <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
           <WifiOffIcon className="size-4 shrink-0" />
           <span>
             Machine is offline. Messages will be processed when it reconnects.
@@ -267,8 +267,8 @@ export default function ThreadsPage() {
           {filteredThreads.map((thread) => (
             <div key={thread.id} className="relative">
               {deletingThreadId === thread.id ? (
-                <div className="flex flex-col gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
-                  <p className="text-sm text-red-800">
+                <div className="flex flex-col gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/30">
+                  <p className="text-sm text-red-800 dark:text-red-400">
                     Delete this thread and all its messages?
                   </p>
                   <div className="flex gap-2">

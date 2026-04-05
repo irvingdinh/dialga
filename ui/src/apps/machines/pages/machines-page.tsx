@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircleIcon, MonitorIcon, PlusIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  MonitorIcon,
+  MoonIcon,
+  PlusIcon,
+  SunIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -9,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { useTheme } from "@/lib/theme";
 
 function MachineListSkeleton() {
   return (
@@ -33,6 +40,7 @@ function MachineListSkeleton() {
 export default function MachinesPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { toggle, resolved } = useTheme();
   const [createOpen, setCreateOpen] = useState(false);
 
   const {
@@ -57,6 +65,13 @@ export default function MachinesPage() {
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <PlusIcon data-icon="inline-start" />
             New
+          </Button>
+          <Button variant="ghost" size="icon-sm" onClick={toggle}>
+            {resolved === "dark" ? (
+              <SunIcon className="size-4" />
+            ) : (
+              <MoonIcon className="size-4" />
+            )}
           </Button>
           <Button variant="ghost" size="sm" onClick={logout}>
             Sign out

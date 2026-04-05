@@ -345,7 +345,7 @@ export default function ThreadViewPage() {
                   if (e.key === "Escape") cancelEditingTitle();
                 }}
                 onBlur={saveTitle}
-                className="bg-muted w-full rounded-md border px-2 py-0.5 text-sm font-semibold tracking-tight outline-none focus:ring-1 focus:ring-neutral-400"
+                className="bg-muted w-full rounded-md border px-2 py-0.5 text-sm font-semibold tracking-tight outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-600"
               />
             ) : (
               <button
@@ -381,8 +381,8 @@ export default function ThreadViewPage() {
       {/* Delete Confirmation Banner */}
       {deleteState !== "idle" && (
         <div className="border-b px-4 py-2">
-          <div className="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
-            <p className="text-sm text-red-800">
+          <div className="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900/50 dark:bg-red-950/30">
+            <p className="text-sm text-red-800 dark:text-red-400">
               Delete this thread and all its messages?
             </p>
             <div className="flex shrink-0 gap-2">
