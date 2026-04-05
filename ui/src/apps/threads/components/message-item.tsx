@@ -5,6 +5,7 @@ import {
   CodeIcon,
   Loader2Icon,
   OctagonAlertIcon,
+  RotateCwIcon,
   TerminalIcon,
   UserIcon,
 } from "lucide-react";
@@ -38,6 +39,7 @@ interface MessageItemProps {
   streamEvents?: StreamEvent[];
   overrideStatus?: string;
   onCancel?: () => void;
+  onRetry?: () => void;
 }
 
 const markdownComponents: Components = {
@@ -378,9 +380,11 @@ function CompletedContent({ groups }: { groups: EventGroup[] }) {
 function StatusIndicator({
   status,
   onCancel,
+  onRetry,
 }: {
   status: string;
   onCancel?: () => void;
+  onRetry?: () => void;
 }) {
   switch (status) {
     case "queued":
@@ -431,6 +435,17 @@ function StatusIndicator({
         <div className="flex items-center gap-1.5 py-1 text-xs text-red-600 dark:text-red-400">
           <OctagonAlertIcon className="size-3" />
           <span>Error</span>
+          {onRetry && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={onRetry}
+              className="text-muted-foreground ml-auto"
+            >
+              <RotateCwIcon data-icon="inline-start" />
+              Retry
+            </Button>
+          )}
         </div>
       );
     case "timed_out":
@@ -438,6 +453,17 @@ function StatusIndicator({
         <div className="flex items-center gap-1.5 py-1 text-xs text-amber-600 dark:text-amber-400">
           <OctagonAlertIcon className="size-3" />
           <span>Timed out</span>
+          {onRetry && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={onRetry}
+              className="text-muted-foreground ml-auto"
+            >
+              <RotateCwIcon data-icon="inline-start" />
+              Retry
+            </Button>
+          )}
         </div>
       );
     default:
@@ -450,6 +476,7 @@ export function MessageItem({
   streamEvents,
   overrideStatus,
   onCancel,
+  onRetry,
 }: MessageItemProps) {
   const status = overrideStatus ?? message.status;
   const isUser = message.role === "user";
@@ -531,7 +558,11 @@ export function MessageItem({
 
           {/* Status indicator for non-completed */}
           {status !== "completed" && (
-            <StatusIndicator status={status} onCancel={onCancel} />
+            <StatusIndicator
+              status={status}
+              onCancel={onCancel}
+              onRetry={onRetry}
+            />
           )}
         </div>
       </div>

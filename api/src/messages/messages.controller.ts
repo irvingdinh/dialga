@@ -91,6 +91,22 @@ export class MessagesController {
     };
   }
 
+  @Post('messages/:id/retry')
+  async retry(@CurrentUser() user: User, @Param('id') id: string) {
+    const m = await this.messagesService.retry(id, user.id);
+    return {
+      assistant_message: {
+        id: m.id,
+        thread_id: m.thread_id,
+        role: m.role,
+        content: m.content,
+        model: m.model,
+        status: m.status,
+        created_at: m.created_at,
+      },
+    };
+  }
+
   @Get('threads/:threadId/messages.jsonl')
   @Header('Content-Type', 'application/x-ndjson')
   async getJsonl(

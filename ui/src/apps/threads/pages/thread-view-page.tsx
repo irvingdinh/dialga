@@ -326,6 +326,39 @@ export default function ThreadViewPage() {
     [threadId, queryClient],
   );
 
+  const handleRetry = useCallback(
+    async (messageId: string) => {
+      if (!threadId) return;
+      try {
+        const result = await api.messages.retry(messageId);
+        // Optimistically add new assistant message to the list
+        queryClient.setQueryData(
+          ["messages", threadId],
+          (old: Awaited<ReturnType<typeof api.messages.list>> | undefined) => [
+            ...(old ?? []),
+            {
+              id: result.assistant_message.id,
+              thread_id: threadId,
+              role: "assistant" as const,
+              content: "",
+              model: result.assistant_message.model,
+              status: result.assistant_message.status,
+              metadata: null,
+              started_at: null,
+              completed_at: null,
+              created_at: result.assistant_message.created_at,
+            },
+          ],
+        );
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : "Failed to retry";
+        toast.error(message);
+      }
+    },
+    [threadId, queryClient],
+  );
+
   const isOffline =
     machineStatus === "offline" ||
     (!machineStatus && machine?.status === "offline");
@@ -515,25 +548,34 @@ export default function ThreadViewPage() {
           {/* Message list */}
           {messages && messages.length > 0 && (
             <div className="flex flex-col gap-6 px-4 py-4">
-              {messages.map((msg) => (
-                <MessageItem
-                  key={msg.id}
-                  message={msg}
-                  streamEvents={streamingEvents.get(msg.id)}
-                  overrideStatus={messageStatuses.get(msg.id)}
-                  onCancel={
-                    msg.role === "assistant" &&
-                    (messageStatuses.get(msg.id) ?? msg.status) !==
-                      "completed" &&
-                    (messageStatuses.get(msg.id) ?? msg.status) !==
-                      "cancelled" &&
-                    (messageStatuses.get(msg.id) ?? msg.status) !== "error" &&
-                    (messageStatuses.get(msg.id) ?? msg.status) !== "timed_out"
-                      ? () => handleCancel(msg.id)
-                      : undefined
-                  }
-                />
-              ))}
+              {messages.map((msg) => {
+                const effectiveStatus =
+                  messageStatuses.get(msg.id) ?? msg.status;
+                return (
+                  <MessageItem
+                    key={msg.id}
+                    message={msg}
+                    streamEvents={streamingEvents.get(msg.id)}
+                    overrideStatus={messageStatuses.get(msg.id)}
+                    onCancel={
+                      msg.role === "assistant" &&
+                      effectiveStatus !== "completed" &&
+                      effectiveStatus !== "cancelled" &&
+                      effectiveStatus !== "error" &&
+                      effectiveStatus !== "timed_out"
+                        ? () => handleCancel(msg.id)
+                        : undefined
+                    }
+                    onRetry={
+                      msg.role === "assistant" &&
+                      (effectiveStatus === "error" ||
+                        effectiveStatus === "timed_out")
+                        ? () => handleRetry(msg.id)
+                        : undefined
+                    }
+                  />
+                );
+              })}
             </div>
           )}
           <div ref={bottomRef} />

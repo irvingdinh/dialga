@@ -233,6 +233,18 @@ export const api = {
         `/api/messages/${messageId}/cancel`,
         { method: "POST" },
       ),
+    retry: (messageId: string) =>
+      request<{
+        assistant_message: {
+          id: string;
+          thread_id: string;
+          role: string;
+          content: string;
+          model: string | null;
+          status: string;
+          created_at: string;
+        };
+      }>(`/api/messages/${messageId}/retry`, { method: "POST" }),
   },
 
   threads: {

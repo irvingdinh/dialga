@@ -159,6 +159,83 @@ export class MessagesService {
     return saved;
   }
 
+  async retry(messageId: string, userId: string): Promise<Message> {
+    const message = await this.messageRepository.findOne({
+      where: { id: messageId },
+      relations: ['thread', 'thread.machine', 'thread.workspace'],
+    });
+    if (!message) throw new NotFoundException('Message not found');
+    if (message.thread.machine.user_id !== userId)
+      throw new ForbiddenException();
+
+    if (message.role !== 'assistant') {
+      throw new BadRequestException('Can only retry assistant messages');
+    }
+
+    if (message.status !== 'error' && message.status !== 'timed_out') {
+      throw new BadRequestException(
+        `Cannot retry message with status "${message.status}"`,
+      );
+    }
+
+    // Find the user message that preceded this assistant message
+    const userMessage = await this.messageRepository
+      .createQueryBuilder('message')
+      .where('message.thread_id = :threadId', {
+        threadId: message.thread_id,
+      })
+      .andWhere('message.role = :role', { role: 'user' })
+      .andWhere('message.created_at <= :createdAt', {
+        createdAt: message.created_at,
+      })
+      .orderBy('message.created_at', 'DESC')
+      .getOne();
+
+    if (!userMessage) {
+      throw new BadRequestException('No user message found to retry');
+    }
+
+    // Create new assistant message (queued)
+    const assistantMessage = this.messageRepository.create({
+      thread_id: message.thread_id,
+      role: 'assistant',
+      content: '',
+      model: message.model,
+      status: 'queued',
+    });
+    await this.messageRepository.save(assistantMessage);
+
+    // Touch thread updated_at
+    const thread = message.thread;
+    thread.updated_at = new Date();
+    await this.threadRepository.save(thread);
+
+    // Dispatch task to agent
+    const dispatched = await this.gatewayService.dispatchTaskWithPrompt(
+      thread.machine_id,
+      assistantMessage,
+      thread,
+      userMessage.content,
+    );
+
+    if (!dispatched) {
+      this.logger.log(
+        `Machine ${thread.machine_id} offline — retry message ${assistantMessage.id} stays queued`,
+      );
+    }
+
+    // Notify thread list about new activity
+    await this.streamingService.publishThreadUpdate(
+      thread.machine_id,
+      thread.id,
+      userMessage.content.slice(0, 100),
+      'active',
+      thread.updated_at,
+    );
+
+    return assistantMessage;
+  }
+
   async getAsJsonl(threadId: string): Promise<string> {
     const messages = await this.messageRepository.find({
       where: { thread_id: threadId },
