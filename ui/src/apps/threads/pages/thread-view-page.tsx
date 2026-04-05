@@ -180,6 +180,7 @@ export default function ThreadViewPage() {
     [messagesData],
   );
 
+  const isPanelOpen = isFileBrowserOpen || isGitPanelOpen;
   const isSearchActive = isSearchOpen && !!searchQuery;
   const displayMessages = isSearchActive
     ? (searchData?.messages ?? [])
@@ -766,173 +767,185 @@ export default function ThreadViewPage() {
         </div>
       )}
 
-      {/* File Browser Panel */}
-      {isFileBrowserOpen && thread?.machine_id && thread?.working_directory && (
-        <div className="flex-1 overflow-hidden border-b">
-          <div className="mx-auto h-full max-w-lg">
-            <FileBrowser
-              machineId={thread.machine_id}
-              rootPath={thread.working_directory}
-              onClose={() => setIsFileBrowserOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      {/* Main content area — split-pane on desktop */}
+      <div className="flex min-h-0 flex-1">
+        {/* Messages column: hidden on mobile when panel open, always visible on desktop */}
+        <div
+          className={`flex min-w-0 flex-1 flex-col ${isPanelOpen ? "hidden lg:flex" : ""}`}
+        >
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-lg">
+              {/* Loading */}
+              {isPageLoading && <ThreadViewSkeleton />}
 
-      {/* Git Panel */}
-      {isGitPanelOpen && thread?.machine_id && thread?.working_directory && (
-        <div className="flex-1 overflow-hidden border-b">
-          <div className="mx-auto h-full max-w-lg">
-            <GitPanel
-              machineId={thread.machine_id}
-              workingDirectory={thread.working_directory}
-              onClose={() => setIsGitPanelOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Messages */}
-      <div
-        ref={scrollContainerRef}
-        className={`flex-1 overflow-y-auto ${isFileBrowserOpen || isGitPanelOpen ? "hidden" : ""}`}
-      >
-        <div className="mx-auto max-w-lg">
-          {/* Loading */}
-          {isPageLoading && <ThreadViewSkeleton />}
-
-          {/* Error */}
-          {isPageError && !isPageLoading && (
-            <div className="flex flex-col items-center px-4 py-16 text-center">
-              <AlertCircleIcon className="text-muted-foreground/40 mb-3 size-8" />
-              <p className="text-muted-foreground text-sm">
-                Failed to load thread.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={() => refetchMessages()}
-              >
-                Retry
-              </Button>
-            </div>
-          )}
-
-          {/* Empty state */}
-          {displayMessages.length === 0 && !isPageLoading && !isPageError && (
-            <div className="flex flex-col items-center px-4 py-16 text-center">
-              {isSearchActive ? (
-                <>
-                  <SearchIcon className="text-muted-foreground/40 mb-3 size-8" />
+              {/* Error */}
+              {isPageError && !isPageLoading && (
+                <div className="flex flex-col items-center px-4 py-16 text-center">
+                  <AlertCircleIcon className="text-muted-foreground/40 mb-3 size-8" />
                   <p className="text-muted-foreground text-sm">
-                    No messages match &ldquo;{searchQuery}&rdquo;
+                    Failed to load thread.
                   </p>
-                </>
-              ) : (
-                <>
-                  <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
-                  <p className="text-muted-foreground text-sm">
-                    No messages yet. Send one to get started.
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Search result count */}
-          {isSearchActive && searchData && searchData.messages.length > 0 && (
-            <div className="px-4 pt-3 pb-0">
-              <p className="text-muted-foreground text-xs">
-                {searchData.messages.length} result
-                {searchData.messages.length !== 1 ? "s" : ""} for &ldquo;
-                {searchQuery}&rdquo;
-              </p>
-            </div>
-          )}
-
-          {/* Message list */}
-          {displayMessages.length > 0 && (
-            <div className="flex flex-col gap-6 px-4 py-4">
-              {/* Load older button — only in normal (non-search) mode */}
-              {!isSearchActive && hasNextPage && (
-                <div className="flex justify-center">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    onClick={handleLoadOlder}
-                    disabled={isFetchingNextPage}
-                    className="text-muted-foreground gap-1.5 text-xs"
+                    className="mt-3"
+                    onClick={() => refetchMessages()}
                   >
-                    {isFetchingNextPage ? (
-                      <LoaderIcon className="size-3.5 animate-spin" />
-                    ) : (
-                      <ChevronUpIcon className="size-3.5" />
-                    )}
-                    {isFetchingNextPage ? "Loading..." : "Load older messages"}
+                    Retry
                   </Button>
                 </div>
               )}
 
-              {displayMessages.map((msg) => {
-                const effectiveStatus =
-                  messageStatuses.get(msg.id) ?? msg.status;
-                return (
-                  <MessageItem
-                    key={msg.id}
-                    message={msg}
-                    streamEvents={
-                      isSearchActive ? undefined : streamingEvents.get(msg.id)
-                    }
-                    overrideStatus={
-                      isSearchActive ? undefined : messageStatuses.get(msg.id)
-                    }
-                    onCancel={
-                      !isSearchActive &&
-                      msg.role === "assistant" &&
-                      effectiveStatus !== "completed" &&
-                      effectiveStatus !== "cancelled" &&
-                      effectiveStatus !== "error" &&
-                      effectiveStatus !== "timed_out"
-                        ? () => handleCancel(msg.id)
-                        : undefined
-                    }
-                    onRetry={
-                      !isSearchActive &&
-                      msg.role === "assistant" &&
-                      (effectiveStatus === "error" ||
-                        effectiveStatus === "timed_out")
-                        ? () => handleRetry(msg.id)
-                        : undefined
-                    }
-                  />
-                );
-              })}
+              {/* Empty state */}
+              {displayMessages.length === 0 &&
+                !isPageLoading &&
+                !isPageError && (
+                  <div className="flex flex-col items-center px-4 py-16 text-center">
+                    {isSearchActive ? (
+                      <>
+                        <SearchIcon className="text-muted-foreground/40 mb-3 size-8" />
+                        <p className="text-muted-foreground text-sm">
+                          No messages match &ldquo;{searchQuery}&rdquo;
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
+                        <p className="text-muted-foreground text-sm">
+                          No messages yet. Send one to get started.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+              {/* Search result count */}
+              {isSearchActive &&
+                searchData &&
+                searchData.messages.length > 0 && (
+                  <div className="px-4 pt-3 pb-0">
+                    <p className="text-muted-foreground text-xs">
+                      {searchData.messages.length} result
+                      {searchData.messages.length !== 1 ? "s" : ""} for &ldquo;
+                      {searchQuery}&rdquo;
+                    </p>
+                  </div>
+                )}
+
+              {/* Message list */}
+              {displayMessages.length > 0 && (
+                <div className="flex flex-col gap-6 px-4 py-4">
+                  {/* Load older button — only in normal (non-search) mode */}
+                  {!isSearchActive && hasNextPage && (
+                    <div className="flex justify-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLoadOlder}
+                        disabled={isFetchingNextPage}
+                        className="text-muted-foreground gap-1.5 text-xs"
+                      >
+                        {isFetchingNextPage ? (
+                          <LoaderIcon className="size-3.5 animate-spin" />
+                        ) : (
+                          <ChevronUpIcon className="size-3.5" />
+                        )}
+                        {isFetchingNextPage
+                          ? "Loading..."
+                          : "Load older messages"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {displayMessages.map((msg) => {
+                    const effectiveStatus =
+                      messageStatuses.get(msg.id) ?? msg.status;
+                    return (
+                      <MessageItem
+                        key={msg.id}
+                        message={msg}
+                        streamEvents={
+                          isSearchActive
+                            ? undefined
+                            : streamingEvents.get(msg.id)
+                        }
+                        overrideStatus={
+                          isSearchActive
+                            ? undefined
+                            : messageStatuses.get(msg.id)
+                        }
+                        onCancel={
+                          !isSearchActive &&
+                          msg.role === "assistant" &&
+                          effectiveStatus !== "completed" &&
+                          effectiveStatus !== "cancelled" &&
+                          effectiveStatus !== "error" &&
+                          effectiveStatus !== "timed_out"
+                            ? () => handleCancel(msg.id)
+                            : undefined
+                        }
+                        onRetry={
+                          !isSearchActive &&
+                          msg.role === "assistant" &&
+                          (effectiveStatus === "error" ||
+                            effectiveStatus === "timed_out")
+                            ? () => handleRetry(msg.id)
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              <div ref={bottomRef} />
             </div>
-          )}
-          <div ref={bottomRef} />
+
+            {/* Scroll-to-bottom floating button */}
+            {!isNearBottom && !isSearchActive && (
+              <div className="pointer-events-none sticky bottom-3 flex justify-center">
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  className="bg-background pointer-events-auto relative flex size-8 items-center justify-center rounded-full border shadow-md transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  title="Scroll to bottom"
+                >
+                  <ArrowDownIcon className="text-muted-foreground size-4" />
+                  {hasNewMessages && (
+                    <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-blue-500" />
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Input */}
+          <MessageInput onSend={handleSend} />
         </div>
 
-        {/* Scroll-to-bottom floating button */}
-        {!isNearBottom && !isSearchActive && (
-          <div className="pointer-events-none sticky bottom-3 flex justify-center">
-            <button
-              type="button"
-              onClick={scrollToBottom}
-              className="bg-background pointer-events-auto relative flex size-8 items-center justify-center rounded-full border shadow-md transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              title="Scroll to bottom"
-            >
-              <ArrowDownIcon className="text-muted-foreground size-4" />
-              {hasNewMessages && (
-                <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-blue-500" />
+        {/* Side panel: file browser or git — on desktop appears beside messages, on mobile replaces them */}
+        {isPanelOpen && (
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:border-l">
+            {isFileBrowserOpen &&
+              thread?.machine_id &&
+              thread?.working_directory && (
+                <FileBrowser
+                  machineId={thread.machine_id}
+                  rootPath={thread.working_directory}
+                  onClose={() => setIsFileBrowserOpen(false)}
+                />
               )}
-            </button>
+            {isGitPanelOpen &&
+              thread?.machine_id &&
+              thread?.working_directory && (
+                <GitPanel
+                  machineId={thread.machine_id}
+                  workingDirectory={thread.working_directory}
+                  onClose={() => setIsGitPanelOpen(false)}
+                />
+              )}
           </div>
         )}
       </div>
-
-      {/* Input */}
-      <MessageInput onSend={handleSend} />
 
       {/* Workspace Selector Dialog */}
       {thread && (
