@@ -14,11 +14,18 @@ interface ConnectedMachine {
   lastHeartbeat: number;
 }
 
+interface PendingRequest {
+  resolve: (value: unknown) => void;
+  reject: (reason: Error) => void;
+  timer: NodeJS.Timeout;
+}
+
 @Injectable()
 export class GatewayService {
   private readonly logger = new Logger(GatewayService.name);
   private readonly connections = new Map<WebSocket, ConnectedMachine>();
   private readonly machineToSocket = new Map<string, WebSocket>();
+  private readonly pendingRequests = new Map<string, PendingRequest>();
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(
@@ -315,6 +322,79 @@ export class GatewayService {
     this.logger.log(
       `Health report from machine ${machineId}: ${JSON.stringify(data)}`,
     );
+  }
+
+  // --- Request/Response Correlation ---
+
+  sendRequest(
+    machineId: string,
+    event: string,
+    data: Record<string, unknown>,
+    timeoutMs = 5000,
+  ): Promise<unknown> {
+    const requestId = crypto.randomUUID();
+    const sent = this.sendToMachine(machineId, event, {
+      ...data,
+      request_id: requestId,
+    });
+    if (!sent) {
+      return Promise.reject(new Error('Machine not connected'));
+    }
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(new Error('Machine not responding'));
+      }, timeoutMs);
+
+      this.pendingRequests.set(requestId, { resolve, reject, timer });
+    });
+  }
+
+  handleRequestResult(
+    data: { request_id: string } & Record<string, unknown>,
+  ): void {
+    const pending = this.pendingRequests.get(data.request_id);
+    if (!pending) return;
+
+    clearTimeout(pending.timer);
+    this.pendingRequests.delete(data.request_id);
+    pending.resolve(data);
+  }
+
+  // --- Filesystem Operations ---
+
+  async fsListDirectory(
+    machineId: string,
+    dirPath: string,
+  ): Promise<{
+    path: string;
+    entries: Array<{ name: string; type: 'directory' | 'file' }>;
+    error?: string;
+  }> {
+    const result = (await this.sendRequest(machineId, 'fs:list', {
+      path: dirPath,
+    })) as {
+      request_id: string;
+      path: string;
+      entries: Array<{ name: string; type: 'directory' | 'file' }>;
+      error?: string;
+    };
+    return { path: result.path, entries: result.entries, error: result.error };
+  }
+
+  async fsMkdir(
+    machineId: string,
+    dirPath: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const result = (await this.sendRequest(machineId, 'fs:mkdir', {
+      path: dirPath,
+    })) as {
+      request_id: string;
+      success: boolean;
+      error?: string;
+    };
+    return { success: result.success, error: result.error };
   }
 
   async dispatchQueuedMessages(machineId: string): Promise<void> {

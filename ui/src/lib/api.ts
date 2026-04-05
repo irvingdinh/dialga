@@ -93,6 +93,23 @@ export const api = {
       }),
   },
 
+  fs: {
+    list: (machineId: string, path: string) =>
+      request<{
+        path: string;
+        entries: Array<{ name: string; type: "directory" | "file" }>;
+        error?: string;
+      }>(`/api/machines/${machineId}/fs?path=${encodeURIComponent(path)}`),
+    mkdir: (machineId: string, path: string) =>
+      request<{ success: boolean; error?: string }>(
+        `/api/machines/${machineId}/fs/mkdir`,
+        {
+          method: "POST",
+          body: JSON.stringify({ path }),
+        },
+      ),
+  },
+
   workspaces: {
     list: (machineId: string) =>
       request<

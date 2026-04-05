@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 
+import { FolderPicker } from "@/apps/machines/components/folder-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -128,18 +129,12 @@ export function WorkspaceDialog({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="ws-dir">Working Directory</Label>
-              <Input
-                id="ws-dir"
+              <Label>Working Directory</Label>
+              <FolderPicker
+                machineId={machineId}
                 value={workingDirectory}
-                onChange={(e) => setWorkingDirectory(e.target.value)}
-                placeholder="/home/user/projects/myapp"
-                required
-                className="font-mono text-xs"
+                onChange={(path) => setWorkingDirectory(path)}
               />
-              <p className="text-muted-foreground text-xs">
-                Absolute path on the machine.
-              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">

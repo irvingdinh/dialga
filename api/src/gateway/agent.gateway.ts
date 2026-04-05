@@ -97,6 +97,13 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
         );
         break;
 
+      case 'fs:list:result':
+      case 'fs:mkdir:result':
+        this.gatewayService.handleRequestResult(
+          parsed.data as { request_id: string } & Record<string, unknown>,
+        );
+        break;
+
       default:
         this.logger.warn(
           `Unknown event "${parsed.event}" from machine ${machineId}`,

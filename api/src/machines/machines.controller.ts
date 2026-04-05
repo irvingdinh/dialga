@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { IsOptional, IsString } from 'class-validator';
@@ -13,6 +14,7 @@ import { IsOptional, IsString } from 'class-validator';
 import { CurrentUser } from '../core/decorators/current-user.decorator.js';
 import type { User } from '../core/entities/index.js';
 import { AuthGuard } from '../core/guards/auth.guard.js';
+import { GatewayService } from '../gateway/gateway.service.js';
 import { MachinesService } from './machines.service.js';
 
 class CreateMachineDto {
@@ -45,7 +47,10 @@ class UpdateMachineDto {
 @Controller('api/machines')
 @UseGuards(AuthGuard)
 export class MachinesController {
-  constructor(private readonly machinesService: MachinesService) {}
+  constructor(
+    private readonly machinesService: MachinesService,
+    private readonly gatewayService: GatewayService,
+  ) {}
 
   @Get()
   async list(@CurrentUser() user: User) {
@@ -110,5 +115,26 @@ export class MachinesController {
   @Post(':id/regenerate-token')
   async regenerateToken(@CurrentUser() user: User, @Param('id') id: string) {
     return this.machinesService.regenerateToken(id, user.id);
+  }
+
+  @Get(':machineId/fs')
+  async fsListDirectory(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Query('path') dirPath: string,
+  ) {
+    // Verify ownership
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.fsListDirectory(machineId, dirPath || '/');
+  }
+
+  @Post(':machineId/fs/mkdir')
+  async fsMkdir(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Body() body: { path: string },
+  ) {
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.fsMkdir(machineId, body.path);
   }
 }
