@@ -32,6 +32,8 @@ interface RunningTask {
   adapter: AgentAdapter;
   textContent: string[];
   allEvents: OutputEvent[];
+  timeoutTimer: NodeJS.Timeout | null;
+  timedOut: boolean;
 }
 
 interface QueuedTask {
@@ -45,6 +47,7 @@ export class TaskService {
   private readonly workspaceQueues = new Map<string, QueuedTask[]>();
   private readonly workspaceRunning = new Set<string>();
   private readonly maxConcurrency: number = 3;
+  private readonly taskTimeoutMs: number;
   private readonly config: AppConfig;
 
   constructor(
@@ -55,6 +58,14 @@ export class TaskService {
     configService: ConfigService,
   ) {
     this.config = configService.get<AppConfig>('root')!;
+    this.taskTimeoutMs = parseInt(process.env.TASK_TIMEOUT_MS || '1800000', 10); // Default: 30 minutes
+    this.logger.log(`Task timeout: ${this.formatDuration(this.taskTimeoutMs)}`);
+  }
+
+  private formatDuration(ms: number): string {
+    const seconds = Math.round(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    return `${Math.round(seconds / 60)}m`;
   }
 
   @OnEvent('ws.task:start')
@@ -99,6 +110,7 @@ export class TaskService {
     }
 
     this.logger.log(`Cancelling task: ${data.message_id}`);
+    if (task.timeoutTimer) clearTimeout(task.timeoutTimer);
     task.adapter.cancel(task.process);
   }
 
@@ -151,9 +163,20 @@ export class TaskService {
       adapter,
       textContent: [],
       allEvents: [],
+      timeoutTimer: null,
+      timedOut: false,
     };
 
     this.runningTasks.set(payload.message_id, task);
+
+    // Set up task timeout
+    task.timeoutTimer = setTimeout(() => {
+      this.logger.warn(
+        `Task ${payload.message_id} timed out after ${this.formatDuration(this.taskTimeoutMs)}`,
+      );
+      task.timedOut = true;
+      task.process.kill('SIGKILL');
+    }, this.taskTimeoutMs);
 
     // Stream stdout line by line
     if (childProcess.stdout) {
@@ -183,13 +206,26 @@ export class TaskService {
       const completedTask = this.runningTasks.get(payload.message_id);
       const assembledContent = completedTask?.textContent.join('') || '';
 
+      // Clear timeout timer
+      if (completedTask?.timeoutTimer) {
+        clearTimeout(completedTask.timeoutTimer);
+      }
+
+      const wasTimedOut = completedTask?.timedOut ?? false;
+
       this.runningTasks.delete(payload.message_id);
       this.workspaceRunning.delete(workDir);
 
-      let status: 'completed' | 'error' | 'cancelled' = 'completed';
+      let status: 'completed' | 'error' | 'cancelled' | 'timed_out' =
+        'completed';
       let summary = assembledContent;
 
-      if (signal === 'SIGTERM') {
+      if (wasTimedOut) {
+        status = 'timed_out';
+        summary =
+          assembledContent ||
+          `Task timed out after ${this.formatDuration(this.taskTimeoutMs)}`;
+      } else if (signal === 'SIGTERM') {
         status = 'cancelled';
         summary = assembledContent || 'Task cancelled by user';
       } else if (code !== 0) {
@@ -217,6 +253,9 @@ export class TaskService {
     });
 
     childProcess.on('error', (err: Error) => {
+      const failedTask = this.runningTasks.get(payload.message_id);
+      if (failedTask?.timeoutTimer) clearTimeout(failedTask.timeoutTimer);
+
       this.runningTasks.delete(payload.message_id);
       this.workspaceRunning.delete(workDir);
 
