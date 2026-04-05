@@ -4,6 +4,8 @@ import { AuthModule } from './auth/auth.module.js';
 import { CoreModule } from './core/core.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MachinesModule } from './machines/machines.module.js';
+import { MessagesModule } from './messages/messages.module.js';
+import { ThreadsModule } from './threads/threads.module.js';
 import { WorkspacesModule } from './workspaces/workspaces.module.js';
 
 @Module({
@@ -13,6 +15,8 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     HealthModule,
     MachinesModule,
     WorkspacesModule,
+    ThreadsModule,
+    MessagesModule,
   ],
 })
 export class AppModule {}
