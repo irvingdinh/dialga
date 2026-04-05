@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 
 import { CoreModule } from './core/core.module';
+import { HealthModule } from './health/health.module';
+import { TaskModule } from './task/task.module';
+import { WebSocketModule } from './websocket/websocket.module';
 
 @Module({
-  imports: [CoreModule],
+  imports: [CoreModule, WebSocketModule, HealthModule, TaskModule],
 })
 export class AppModule {}

@@ -10,6 +10,10 @@ export interface AppConfig {
   data: {
     dir: string;
   };
+  agent: {
+    token: string;
+    server: string;
+  };
 }
 
 export const config = (): { root: AppConfig } => ({
@@ -21,8 +25,29 @@ export const config = (): { root: AppConfig } => ({
     data: {
       dir: ensureDataDir(),
     },
+    agent: {
+      token: resolveArg('token') || process.env.DIALGA_TOKEN || '',
+      server:
+        resolveArg('server') ||
+        process.env.DIALGA_SERVER ||
+        'http://localhost:48310',
+    },
   },
 });
+
+const resolveArg = (name: string): string | undefined => {
+  const args = process.argv.slice(2);
+  const prefix = `--${name}`;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === prefix && args[i + 1]) {
+      return args[i + 1];
+    }
+    if (args[i].startsWith(`${prefix}=`)) {
+      return args[i].slice(prefix.length + 1);
+    }
+  }
+  return undefined;
+};
 
 const ensureDataDir = (): string => {
   let dir = join(homedir(), '.dialga');
