@@ -16,6 +16,11 @@ interface FsMkdirRequest {
   path: string;
 }
 
+interface FsReadRequest {
+  request_id: string;
+  path: string;
+}
+
 interface FsEntry {
   name: string;
   type: 'directory' | 'file';
@@ -65,6 +70,56 @@ export class FilesystemService {
         request_id: data.request_id,
         path: dirPath,
         entries: [],
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  @OnEvent('ws.fs:read')
+  handleFsRead(data: FsReadRequest): void {
+    const filePath = data.path;
+
+    try {
+      const resolved = path.resolve(filePath);
+      const stat = fs.statSync(resolved);
+
+      // Reject directories
+      if (stat.isDirectory()) {
+        this.ws.send('fs:read:result', {
+          request_id: data.request_id,
+          path: resolved,
+          content: null,
+          error: 'Path is a directory, not a file',
+        });
+        return;
+      }
+
+      // Reject files larger than 1MB
+      if (stat.size > 1024 * 1024) {
+        this.ws.send('fs:read:result', {
+          request_id: data.request_id,
+          path: resolved,
+          content: null,
+          error: `File too large (${Math.round(stat.size / 1024)}KB). Maximum is 1MB.`,
+        });
+        return;
+      }
+
+      const content = fs.readFileSync(resolved, 'utf-8');
+      this.ws.send('fs:read:result', {
+        request_id: data.request_id,
+        path: resolved,
+        content,
+        size: stat.size,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `fs:read failed for ${filePath}: ${(err as Error).message}`,
+      );
+      this.ws.send('fs:read:result', {
+        request_id: data.request_id,
+        path: filePath,
+        content: null,
         error: (err as Error).message,
       });
     }

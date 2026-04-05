@@ -139,4 +139,14 @@ export class MachinesController {
     await this.machinesService.findOne(machineId, user.id);
     return this.gatewayService.fsMkdir(machineId, body.path);
   }
+
+  @Get(':machineId/fs/read')
+  async fsReadFile(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Query('path') filePath: string,
+  ) {
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.fsReadFile(machineId, filePath || '/');
+  }
 }

@@ -122,6 +122,13 @@ export const api = {
           body: JSON.stringify({ path }),
         },
       ),
+    read: (machineId: string, path: string) =>
+      request<{
+        path: string;
+        content: string | null;
+        size?: number;
+        error?: string;
+      }>(`/api/machines/${machineId}/fs/read?path=${encodeURIComponent(path)}`),
   },
 
   workspaces: {
@@ -305,6 +312,7 @@ export const api = {
         machine_id: string;
         workspace_id: string | null;
         workspace_name: string | null;
+        working_directory: string | null;
         title: string | null;
         status: string;
         created_at: string;

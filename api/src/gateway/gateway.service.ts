@@ -429,6 +429,32 @@ export class GatewayService {
     return { success: result.success, error: result.error };
   }
 
+  async fsReadFile(
+    machineId: string,
+    filePath: string,
+  ): Promise<{
+    path: string;
+    content: string | null;
+    size?: number;
+    error?: string;
+  }> {
+    const result = (await this.sendRequest(machineId, 'fs:read', {
+      path: filePath,
+    })) as {
+      request_id: string;
+      path: string;
+      content: string | null;
+      size?: number;
+      error?: string;
+    };
+    return {
+      path: result.path,
+      content: result.content,
+      size: result.size,
+      error: result.error,
+    };
+  }
+
   async dispatchQueuedMessages(machineId: string): Promise<void> {
     // Find all queued assistant messages for threads on this machine
     const queuedMessages = await this.messageRepository

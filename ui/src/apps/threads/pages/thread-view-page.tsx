@@ -10,6 +10,7 @@ import {
   ArchiveRestoreIcon,
   ArrowLeftIcon,
   ChevronUpIcon,
+  FolderOpenIcon,
   LoaderIcon,
   MessageSquareIcon,
   PencilIcon,
@@ -22,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
+import { FileBrowser } from "@/apps/threads/components/file-browser";
 import { MessageInput } from "@/apps/threads/components/message-input";
 import {
   MessageItem,
@@ -81,6 +83,9 @@ export default function ThreadViewPage() {
     new Map(),
   );
   const [machineStatus, setMachineStatus] = useState<string | null>(null);
+
+  // File browser state
+  const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -530,6 +535,17 @@ export default function ThreadViewPage() {
           </div>
           {!threadLoading && (
             <div className="flex shrink-0 items-center gap-0.5">
+              {thread?.working_directory && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setIsFileBrowserOpen((v) => !v)}
+                  className={`shrink-0 ${isFileBrowserOpen ? "text-foreground" : "text-muted-foreground"}`}
+                  title="Browse workspace files"
+                >
+                  <FolderOpenIcon className="size-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -662,8 +678,24 @@ export default function ThreadViewPage() {
         </div>
       )}
 
+      {/* File Browser Panel */}
+      {isFileBrowserOpen && thread?.machine_id && thread?.working_directory && (
+        <div className="flex-1 overflow-hidden border-b">
+          <div className="mx-auto h-full max-w-lg">
+            <FileBrowser
+              machineId={thread.machine_id}
+              rootPath={thread.working_directory}
+              onClose={() => setIsFileBrowserOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+      <div
+        ref={scrollContainerRef}
+        className={`flex-1 overflow-y-auto ${isFileBrowserOpen ? "hidden" : ""}`}
+      >
         <div className="mx-auto max-w-lg">
           {/* Loading */}
           {isPageLoading && <ThreadViewSkeleton />}
