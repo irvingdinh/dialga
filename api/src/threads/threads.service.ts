@@ -37,6 +37,7 @@ export class ThreadsService {
     workspaceId?: string,
     status?: string,
     q?: string,
+    sort?: string,
   ): Promise<Thread[]> {
     await this.verifyMachineOwnership(machineId, userId);
 
@@ -64,7 +65,21 @@ export class ThreadsService {
         .addGroupBy('workspace.id');
     }
 
-    qb.orderBy('thread.updated_at', 'DESC');
+    // Sort: updated (default), created, title, created_asc
+    switch (sort) {
+      case 'created':
+        qb.orderBy('thread.created_at', 'DESC');
+        break;
+      case 'created_asc':
+        qb.orderBy('thread.created_at', 'ASC');
+        break;
+      case 'title':
+        qb.orderBy('thread.title', 'ASC');
+        break;
+      default:
+        qb.orderBy('thread.updated_at', 'DESC');
+        break;
+    }
 
     return qb.getMany();
   }

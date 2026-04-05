@@ -258,10 +258,14 @@ export const api = {
   },
 
   threads: {
-    list: (machineId: string, params?: { status?: string; q?: string }) => {
+    list: (
+      machineId: string,
+      params?: { status?: string; q?: string; sort?: string },
+    ) => {
       const sp = new URLSearchParams();
       if (params?.status) sp.set("status", params.status);
       if (params?.q) sp.set("q", params.q);
+      if (params?.sort) sp.set("sort", params.sort);
       const query = sp.toString() ? `?${sp.toString()}` : "";
       return request<
         Array<{

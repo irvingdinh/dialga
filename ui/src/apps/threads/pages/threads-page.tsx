@@ -101,6 +101,9 @@ export default function ThreadsPage() {
   const [workspaceFilter, setWorkspaceFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string>(
+    () => localStorage.getItem("dialga-thread-sort") || "updated",
+  );
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -133,11 +136,13 @@ export default function ThreadsPage() {
       machineId,
       showArchived ? "all" : "active",
       searchQuery,
+      sortBy,
     ],
     queryFn: () =>
       api.threads.list(machineId!, {
         status: showArchived ? "all" : "active",
         q: searchQuery || undefined,
+        sort: sortBy !== "updated" ? sortBy : undefined,
       }),
     enabled: !!machineId,
   });
@@ -334,6 +339,19 @@ export default function ThreadsPage() {
             ))}
           </select>
         )}
+        <select
+          value={sortBy}
+          onChange={(e) => {
+            setSortBy(e.target.value);
+            localStorage.setItem("dialga-thread-sort", e.target.value);
+          }}
+          className="border-input bg-background text-foreground shrink-0 rounded-xl border px-3 py-2 text-sm"
+        >
+          <option value="updated">Last updated</option>
+          <option value="created">Newest first</option>
+          <option value="created_asc">Oldest first</option>
+          <option value="title">Alphabetical</option>
+        </select>
         <Button
           variant={showArchived ? "secondary" : "ghost"}
           size="sm"
