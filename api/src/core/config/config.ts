@@ -11,6 +11,7 @@ export interface AppConfig {
     name: string;
   };
   redis: {
+    url?: string;
     host: string;
     port: number;
     user?: string;
@@ -37,6 +38,7 @@ export const config = (): { root: AppConfig } => ({
       name: process.env.DB_NAME || 'dialga',
     },
     redis: {
+      url: process.env.REDIS_URL || undefined,
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
       user: process.env.REDIS_USER || undefined,

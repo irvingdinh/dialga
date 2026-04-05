@@ -27,22 +27,22 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {
     const redisConfig = this.configService.get<AppConfig>('root')!.redis;
-    this.publisher = new Redis({
-      host: redisConfig.host,
-      port: redisConfig.port,
-      username: redisConfig.user,
-      password: redisConfig.password,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true,
-    });
-    this.subscriber = new Redis({
-      host: redisConfig.host,
-      port: redisConfig.port,
-      username: redisConfig.user,
-      password: redisConfig.password,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true,
-    });
+    const redisOptions = redisConfig.url
+      ? { maxRetriesPerRequest: 3, lazyConnect: true }
+      : {
+          host: redisConfig.host,
+          port: redisConfig.port,
+          username: redisConfig.user,
+          password: redisConfig.password,
+          maxRetriesPerRequest: 3,
+          lazyConnect: true,
+        };
+    this.publisher = redisConfig.url
+      ? new Redis(redisConfig.url, redisOptions)
+      : new Redis(redisOptions);
+    this.subscriber = redisConfig.url
+      ? new Redis(redisConfig.url, redisOptions)
+      : new Redis(redisOptions);
   }
 
   async onModuleInit() {
