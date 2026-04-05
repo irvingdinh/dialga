@@ -1,5 +1,3 @@
-import { ServiceAccount } from 'firebase-admin';
-
 export interface AppConfig {
   http: {
     host: string;
@@ -12,10 +10,10 @@ export interface AppConfig {
     password: string;
     name: string;
   };
-  services: {
-    firebase: {
-      serviceAccount: ServiceAccount;
-    };
+  jwt: {
+    secret: string;
+    accessTokenExpirySeconds: number;
+    refreshTokenDays: number;
   };
 }
 
@@ -32,21 +30,11 @@ export const config = (): { root: AppConfig } => ({
       password: process.env.DB_PASSWORD || '',
       name: process.env.DB_NAME || 'dialga',
     },
-    services: {
-      firebase: {
-        serviceAccount: ensureFirebaseServiceAccount(),
-      },
+    jwt: {
+      secret:
+        process.env.JWT_SECRET || 'dialga-dev-secret-change-in-production',
+      accessTokenExpirySeconds: 900,
+      refreshTokenDays: 365,
     },
   },
 });
-
-const ensureFirebaseServiceAccount = (): ServiceAccount => {
-  const serviceAccountAsBase64 = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccountAsBase64) {
-    throw new Error(`FIREBASE_SERVICE_ACCOUNT is required.`);
-  }
-
-  return JSON.parse(
-    Buffer.from(serviceAccountAsBase64, 'base64').toString(),
-  ) as ServiceAccount;
-};
