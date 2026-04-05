@@ -8,13 +8,17 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Machine } from '../core/entities/index.js';
+import { Machine, Thread, Workspace } from '../core/entities/index.js';
 
 @Injectable()
 export class MachinesService {
   constructor(
     @InjectRepository(Machine)
     private readonly machineRepository: Repository<Machine>,
+    @InjectRepository(Thread)
+    private readonly threadRepository: Repository<Thread>,
+    @InjectRepository(Workspace)
+    private readonly workspaceRepository: Repository<Workspace>,
   ) {}
 
   async list(userId: string): Promise<Machine[]> {
@@ -22,6 +26,49 @@ export class MachinesService {
       where: { user_id: userId },
       order: { created_at: 'DESC' },
     });
+  }
+
+  async getListCounts(
+    machineIds: string[],
+  ): Promise<Map<string, { thread_count: number; workspace_count: number }>> {
+    const result = new Map<
+      string,
+      { thread_count: number; workspace_count: number }
+    >();
+    for (const id of machineIds) {
+      result.set(id, { thread_count: 0, workspace_count: 0 });
+    }
+
+    if (machineIds.length === 0) return result;
+
+    const threadCounts = await this.threadRepository
+      .createQueryBuilder('t')
+      .select('t.machine_id', 'machine_id')
+      .addSelect('COUNT(*)', 'count')
+      .where('t.machine_id IN (:...ids)', { ids: machineIds })
+      .groupBy('t.machine_id')
+      .getRawMany<{ machine_id: string; count: string }>();
+
+    for (const row of threadCounts) {
+      const entry = result.get(row.machine_id);
+      if (entry) entry.thread_count = parseInt(row.count, 10);
+    }
+
+    const workspaceCounts = await this.workspaceRepository
+      .createQueryBuilder('w')
+      .select('w.machine_id', 'machine_id')
+      .addSelect('COUNT(*)', 'count')
+      .where('w.machine_id IN (:...ids)', { ids: machineIds })
+      .andWhere('w.deleted_at IS NULL')
+      .groupBy('w.machine_id')
+      .getRawMany<{ machine_id: string; count: string }>();
+
+    for (const row of workspaceCounts) {
+      const entry = result.get(row.machine_id);
+      if (entry) entry.workspace_count = parseInt(row.count, 10);
+    }
+
+    return result;
   }
 
   async create(

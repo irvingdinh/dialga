@@ -55,16 +55,24 @@ export class MachinesController {
   @Get()
   async list(@CurrentUser() user: User) {
     const machines = await this.machinesService.list(user.id);
-    return machines.map((m) => ({
-      id: m.id,
-      name: m.name,
-      default_agent: m.default_agent,
-      default_model: m.default_model,
-      status: m.status,
-      health_info: m.health_info,
-      last_seen_at: m.last_seen_at,
-      created_at: m.created_at,
-    }));
+    const counts = await this.machinesService.getListCounts(
+      machines.map((m) => m.id),
+    );
+    return machines.map((m) => {
+      const c = counts.get(m.id);
+      return {
+        id: m.id,
+        name: m.name,
+        default_agent: m.default_agent,
+        default_model: m.default_model,
+        status: m.status,
+        health_info: m.health_info,
+        last_seen_at: m.last_seen_at,
+        created_at: m.created_at,
+        thread_count: c?.thread_count ?? 0,
+        workspace_count: c?.workspace_count ?? 0,
+      };
+    });
   }
 
   @Post()

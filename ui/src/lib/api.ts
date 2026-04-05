@@ -63,6 +63,8 @@ export const api = {
           health_info: HealthInfo | null;
           last_seen_at: string | null;
           created_at: string;
+          thread_count: number;
+          workspace_count: number;
         }>
       >("/api/machines"),
     create: (data: {
