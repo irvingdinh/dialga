@@ -9,8 +9,10 @@ import {
   UserIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 
+import { CodeBlock } from "@/apps/threads/components/code-block";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -30,11 +32,39 @@ interface MessageItemProps {
     content: string;
     model: string | null;
     status: string;
+    metadata: Record<string, unknown> | null;
     created_at: string;
   };
   streamEvents?: StreamEvent[];
   overrideStatus?: string;
   onCancel?: () => void;
+}
+
+const markdownComponents: Components = {
+  pre({ children }) {
+    return <>{children}</>;
+  },
+  code({ className, children }) {
+    const match = /language-(\w+)/.exec(className || "");
+    const code = String(children);
+    // Inline code (no language class, single line, short)
+    if (!match && !code.includes("\n") && code.length < 200) {
+      return (
+        <code className="bg-muted rounded px-1.5 py-0.5 text-[13px]">
+          {code}
+        </code>
+      );
+    }
+    return <CodeBlock language={match?.[1]}>{code}</CodeBlock>;
+  },
+};
+
+function MarkdownContent({ children }: { children: string }) {
+  return (
+    <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none overflow-x-hidden">
+      <Markdown components={markdownComponents}>{children}</Markdown>
+    </div>
+  );
 }
 
 interface EventGroup {
@@ -197,14 +227,115 @@ function StreamingContent({ events }: { events: StreamEvent[] }) {
           case "thinking":
             return <ThinkingBlock key={i} content={group.content} />;
           case "text":
+            return <MarkdownContent key={i}>{group.content}</MarkdownContent>;
+          case "tool_call":
+            return (
+              <ToolCallBlock
+                key={i}
+                tool={group.tool}
+                file={group.file}
+                content={group.content}
+              />
+            );
+          case "tool_result":
+            return <ToolResultBlock key={i} content={group.content} />;
+          case "error":
             return (
               <div
                 key={i}
-                className="prose prose-sm prose-neutral dark:prose-invert max-w-none overflow-x-hidden"
+                className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400"
               >
-                <Markdown>{group.content}</Markdown>
+                <OctagonAlertIcon className="mt-0.5 size-3 shrink-0" />
+                <pre className="font-mono whitespace-pre-wrap">
+                  {group.content}
+                </pre>
               </div>
             );
+          case "result":
+            return (
+              <ResultFooter
+                key={i}
+                content={group.content}
+                metadata={group.metadata}
+              />
+            );
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+}
+
+function parseMetadataEvents(
+  metadata: Record<string, unknown> | null,
+): EventGroup[] | null {
+  if (!metadata) return null;
+  try {
+    const parsed = metadata as {
+      events?: Array<{
+        type: string;
+        content: string;
+        tool?: string;
+        file?: string;
+        metadata?: Record<string, unknown>;
+      }>;
+      total_cost_usd?: number;
+      duration_ms?: number;
+      tokens_used?: number;
+    };
+    if (!parsed.events || !Array.isArray(parsed.events)) return null;
+    // Group consecutive same-type events (text, thinking)
+    const groups: EventGroup[] = [];
+    for (const event of parsed.events) {
+      const last = groups[groups.length - 1];
+      if (
+        last &&
+        last.type === event.type &&
+        (event.type === "text" || event.type === "thinking")
+      ) {
+        last.content += event.content;
+      } else {
+        groups.push({
+          type: event.type,
+          content: event.content,
+          tool: event.tool,
+          file: event.file,
+          metadata: event.metadata,
+        });
+      }
+    }
+    // If the result event from agent includes cost/duration, ensure we have a result group
+    const hasResult = groups.some((g) => g.type === "result");
+    if (
+      !hasResult &&
+      (parsed.total_cost_usd || parsed.duration_ms || parsed.tokens_used)
+    ) {
+      groups.push({
+        type: "result",
+        content: "",
+        metadata: {
+          total_cost_usd: parsed.total_cost_usd,
+          duration_ms: parsed.duration_ms,
+          tokens_used: parsed.tokens_used,
+        },
+      });
+    }
+    return groups.length > 0 ? groups : null;
+  } catch {
+    return null;
+  }
+}
+
+function CompletedContent({ groups }: { groups: EventGroup[] }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {groups.map((group, i) => {
+        switch (group.type) {
+          case "thinking":
+            return <ThinkingBlock key={i} content={group.content} />;
+          case "text":
+            return <MarkdownContent key={i}>{group.content}</MarkdownContent>;
           case "tool_call":
             return (
               <ToolCallBlock
@@ -323,6 +454,10 @@ export function MessageItem({
   const status = overrideStatus ?? message.status;
   const isUser = message.role === "user";
   const hasStreamEvents = streamEvents && streamEvents.length > 0;
+  const metadataGroups = useMemo(
+    () => parseMetadataEvents(message.metadata),
+    [message.metadata],
+  );
 
   if (isUser) {
     return (
@@ -374,12 +509,16 @@ export function MessageItem({
           {/* Streaming content */}
           {hasStreamEvents && <StreamingContent events={streamEvents} />}
 
-          {/* Static content for completed messages */}
-          {!hasStreamEvents && status === "completed" && message.content && (
-            <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none overflow-x-hidden">
-              <Markdown>{message.content}</Markdown>
-            </div>
-          )}
+          {/* Static content for completed messages — prefer metadata events */}
+          {!hasStreamEvents &&
+            status === "completed" &&
+            (metadataGroups ? (
+              <CompletedContent groups={metadataGroups} />
+            ) : (
+              message.content && (
+                <MarkdownContent>{message.content}</MarkdownContent>
+              )
+            ))}
 
           {/* Content + status for error/timed_out messages */}
           {!hasStreamEvents &&
