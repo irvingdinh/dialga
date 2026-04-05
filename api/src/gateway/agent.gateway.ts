@@ -32,15 +32,17 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    await this.gatewayService.registerConnection(machine.id, socket);
-
-    // Set up message handler
+    // Register message handler BEFORE async registration to avoid dropping
+    // messages the agent sends immediately on connect (e.g. crash recovery reports)
+    const machineId = machine.id;
     socket.on('message', (raw: Buffer | string) => {
-      void this.handleMessage(socket, raw);
+      void this.handleMessage(socket, machineId, raw);
     });
 
+    await this.gatewayService.registerConnection(machineId, socket);
+
     // Dispatch any queued messages that were waiting while machine was offline
-    await this.gatewayService.dispatchQueuedMessages(machine.id);
+    await this.gatewayService.dispatchQueuedMessages(machineId);
   }
 
   async handleDisconnect(socket: WebSocket) {
@@ -49,11 +51,9 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async handleMessage(
     socket: WebSocket,
+    machineId: string,
     raw: Buffer | string,
   ): Promise<void> {
-    const machineId = this.gatewayService.getMachineIdForSocket(socket);
-    if (!machineId) return;
-
     let parsed: { event: string; data?: unknown };
     try {
       parsed = JSON.parse(raw.toString());

@@ -1,16 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
+import { InjectRepository } from '@nestjs/typeorm';
 import { type ChildProcess } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { createInterface } from 'readline';
+import { Repository } from 'typeorm';
 
 import type { AgentAdapter, OutputEvent } from '../adapters/adapter.interface';
 import { ClaudeAdapter } from '../adapters/claude.adapter';
 import { CodexAdapter } from '../adapters/codex.adapter';
 import { AppConfig } from '../core/config/config';
+import { TaskRecord } from '../core/entities/task-record.entity';
 import { HealthCheckService } from '../health/health.service';
 import { WebSocketService } from '../websocket/websocket.service';
 
@@ -41,7 +44,7 @@ interface QueuedTask {
 }
 
 @Injectable()
-export class TaskService {
+export class TaskService implements OnModuleInit {
   private readonly logger = new Logger(TaskService.name);
   private readonly runningTasks = new Map<string, RunningTask>();
   private readonly workspaceQueues = new Map<string, QueuedTask[]>();
@@ -49,12 +52,15 @@ export class TaskService {
   private readonly maxConcurrency: number = 3;
   private readonly taskTimeoutMs: number;
   private readonly config: AppConfig;
+  private interruptedTaskIds: string[] = [];
 
   constructor(
     private readonly wsService: WebSocketService,
     private readonly healthService: HealthCheckService,
     private readonly claudeAdapter: ClaudeAdapter,
     private readonly codexAdapter: CodexAdapter,
+    @InjectRepository(TaskRecord)
+    private readonly taskRecordRepository: Repository<TaskRecord>,
     configService: ConfigService,
   ) {
     this.config = configService.get<AppConfig>('root')!;
@@ -62,10 +68,62 @@ export class TaskService {
     this.logger.log(`Task timeout: ${this.formatDuration(this.taskTimeoutMs)}`);
   }
 
+  async onModuleInit() {
+    await this.recoverInterruptedTasks();
+    // If WebSocket connected before onModuleInit (race with startup), report now
+    if (this.interruptedTaskIds.length > 0 && this.wsService.isConnected()) {
+      this.reportInterruptedTasks();
+    }
+  }
+
   private formatDuration(ms: number): string {
     const seconds = Math.round(ms / 1000);
     if (seconds < 60) return `${seconds}s`;
     return `${Math.round(seconds / 60)}m`;
+  }
+
+  private async recoverInterruptedTasks(): Promise<void> {
+    const runningRecords = await this.taskRecordRepository.find({
+      where: { status: 'running' },
+    });
+
+    if (runningRecords.length === 0) return;
+
+    this.logger.warn(
+      `Found ${runningRecords.length} interrupted task(s) from previous session`,
+    );
+
+    for (const record of runningRecords) {
+      record.status = 'interrupted';
+      record.completed_at = new Date();
+      await this.taskRecordRepository.save(record);
+      this.interruptedTaskIds.push(record.message_id);
+      this.logger.warn(`Marked task ${record.message_id} as interrupted`);
+    }
+  }
+
+  @OnEvent('ws.connected')
+  onConnected(): void {
+    this.reportInterruptedTasks();
+  }
+
+  private reportInterruptedTasks(): void {
+    if (this.interruptedTaskIds.length === 0) return;
+
+    this.logger.log(
+      `Reporting ${this.interruptedTaskIds.length} interrupted task(s) to API`,
+    );
+
+    for (const messageId of this.interruptedTaskIds) {
+      this.wsService.send('task:complete', {
+        message_id: messageId,
+        status: 'error',
+        summary:
+          'Task interrupted — agent crashed or restarted while this task was running',
+      });
+    }
+
+    this.interruptedTaskIds = [];
   }
 
   @OnEvent('ws.task:start')
@@ -169,6 +227,16 @@ export class TaskService {
 
     this.runningTasks.set(payload.message_id, task);
 
+    // Persist to SQLite for crash recovery
+    await this.taskRecordRepository.save({
+      message_id: payload.message_id,
+      thread_id: payload.thread_id,
+      working_directory: workDir,
+      status: 'running' as const,
+      started_at: new Date(),
+      completed_at: null,
+    });
+
     // Set up task timeout
     task.timeoutTimer = setTimeout(() => {
       this.logger.warn(
@@ -233,6 +301,16 @@ export class TaskService {
         summary = stderr.trim() || `Process exited with code ${code}`;
       }
 
+      // Update SQLite record
+      this.taskRecordRepository
+        .update(payload.message_id, {
+          status,
+          completed_at: new Date(),
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Failed to update task record: ${err.message}`),
+        );
+
       this.wsService.send('task:complete', {
         message_id: payload.message_id,
         status,
@@ -258,6 +336,16 @@ export class TaskService {
 
       this.runningTasks.delete(payload.message_id);
       this.workspaceRunning.delete(workDir);
+
+      // Update SQLite record
+      this.taskRecordRepository
+        .update(payload.message_id, {
+          status: 'error' as const,
+          completed_at: new Date(),
+        })
+        .catch((e: Error) =>
+          this.logger.warn(`Failed to update task record: ${e.message}`),
+        );
 
       this.wsService.send('task:complete', {
         message_id: payload.message_id,

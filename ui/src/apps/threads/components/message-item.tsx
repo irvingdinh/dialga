@@ -381,6 +381,15 @@ export function MessageItem({
             </div>
           )}
 
+          {/* Content + status for error/timed_out messages */}
+          {!hasStreamEvents &&
+            (status === "error" || status === "timed_out") &&
+            message.content && (
+              <p className="text-muted-foreground mt-1 text-sm italic">
+                {message.content}
+              </p>
+            )}
+
           {/* Status indicator for non-completed */}
           {status !== "completed" && (
             <StatusIndicator status={status} onCancel={onCancel} />
