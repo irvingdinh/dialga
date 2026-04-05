@@ -2,15 +2,19 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Machine, Message, Thread } from '../core/entities/index.js';
+import { GatewayService } from '../gateway/gateway.service.js';
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
+
   constructor(
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
@@ -18,7 +22,20 @@ export class MessagesService {
     private readonly threadRepository: Repository<Thread>,
     @InjectRepository(Machine)
     private readonly machineRepository: Repository<Machine>,
+    private readonly gatewayService: GatewayService,
   ) {}
+
+  async verifyThreadBelongsToMachine(
+    threadId: string,
+    machineId: string,
+  ): Promise<Thread> {
+    const thread = await this.threadRepository.findOne({
+      where: { id: threadId },
+    });
+    if (!thread) throw new NotFoundException('Thread not found');
+    if (thread.machine_id !== machineId) throw new ForbiddenException();
+    return thread;
+  }
 
   private async verifyThreadOwnership(
     threadId: string,
@@ -77,6 +94,20 @@ export class MessagesService {
     thread.updated_at = new Date();
     await this.threadRepository.save(thread);
 
+    // Dispatch task to agent if machine is online
+    const dispatched = await this.gatewayService.dispatchTaskWithPrompt(
+      thread.machine_id,
+      assistantMessage,
+      thread,
+      data.content,
+    );
+
+    if (!dispatched) {
+      this.logger.log(
+        `Machine ${thread.machine_id} offline — message ${assistantMessage.id} stays queued`,
+      );
+    }
+
     return { userMessage, assistantMessage };
   }
 
@@ -92,6 +123,15 @@ export class MessagesService {
     if (message.status !== 'queued' && message.status !== 'running') {
       throw new BadRequestException(
         `Cannot cancel message with status "${message.status}"`,
+      );
+    }
+
+    // Send cancel event to agent if task is running
+    if (message.status === 'running') {
+      this.gatewayService.sendToMachine(
+        message.thread.machine_id,
+        'task:cancel',
+        { message_id: message.id },
       );
     }
 

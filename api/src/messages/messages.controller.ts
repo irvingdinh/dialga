@@ -5,15 +5,17 @@ import {
   Header,
   Param,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { IsOptional, IsString } from 'class-validator';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 
 import { CurrentUser } from '../core/decorators/current-user.decorator.js';
 import type { User } from '../core/entities/index.js';
 import { AuthGuard } from '../core/guards/auth.guard.js';
+import { MachineAuthGuard } from '../core/guards/machine-auth.guard.js';
 import { MessagesService } from './messages.service.js';
 
 class SendMessageDto {
@@ -98,6 +100,29 @@ export class MessagesController {
   ) {
     // Verify ownership
     await this.messagesService.list(threadId, user.id);
+    const jsonl = await this.messagesService.getAsJsonl(threadId);
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.send(jsonl);
+  }
+}
+
+@Controller('api')
+@UseGuards(MachineAuthGuard)
+export class MachineMessagesController {
+  constructor(private readonly messagesService: MessagesService) {}
+
+  @Get('agent/threads/:threadId/messages.jsonl')
+  @Header('Content-Type', 'application/x-ndjson')
+  async getJsonl(
+    @Req() req: Request,
+    @Param('threadId') threadId: string,
+    @Res() res: Response,
+  ) {
+    const machine = (req as Request & { machine: { id: string } }).machine;
+    await this.messagesService.verifyThreadBelongsToMachine(
+      threadId,
+      machine.id,
+    );
     const jsonl = await this.messagesService.getAsJsonl(threadId);
     res.setHeader('Content-Type', 'application/x-ndjson');
     res.send(jsonl);
