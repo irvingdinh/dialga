@@ -50,3 +50,6 @@ vite.config.ts.timestamp-*
 
 # OS
 .DS_Store
+
+# playwright-cli
+.playwright-cli

@@ -13,6 +13,8 @@ export interface AppConfig {
   redis: {
     host: string;
     port: number;
+    user?: string;
+    password?: string;
   };
   jwt: {
     secret: string;
@@ -37,6 +39,8 @@ export const config = (): { root: AppConfig } => ({
     redis: {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      user: process.env.REDIS_USER || undefined,
+      password: process.env.REDIS_PASSWORD || undefined,
     },
     jwt: {
       secret:

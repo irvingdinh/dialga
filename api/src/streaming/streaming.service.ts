@@ -30,12 +30,16 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
     this.publisher = new Redis({
       host: redisConfig.host,
       port: redisConfig.port,
+      username: redisConfig.user,
+      password: redisConfig.password,
       maxRetriesPerRequest: 3,
       lazyConnect: true,
     });
     this.subscriber = new Redis({
       host: redisConfig.host,
       port: redisConfig.port,
+      username: redisConfig.user,
+      password: redisConfig.password,
       maxRetriesPerRequest: 3,
       lazyConnect: true,
     });
