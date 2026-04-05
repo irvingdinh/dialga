@@ -4,6 +4,7 @@ import {
   FolderIcon,
   MessageSquareIcon,
   PlusIcon,
+  SettingsIcon,
   WifiOffIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -142,10 +143,19 @@ export default function ThreadsPage() {
             <p className="text-muted-foreground text-xs">Threads</p>
           </div>
         </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <PlusIcon data-icon="inline-start" />
-          New
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => navigate(`/machines/${machineId}/settings`)}
+          >
+            <SettingsIcon className="size-4" />
+          </Button>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <PlusIcon data-icon="inline-start" />
+            New
+          </Button>
+        </div>
       </div>
 
       {/* Offline Banner */}
