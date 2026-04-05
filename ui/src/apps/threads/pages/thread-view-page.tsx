@@ -8,6 +8,7 @@ import {
   AlertCircleIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
+  ArrowDownIcon,
   ArrowLeftIcon,
   ChevronUpIcon,
   DownloadIcon,
@@ -97,6 +98,11 @@ export default function ThreadViewPage() {
 
   // Workspace selector state
   const [isWorkspaceSelectorOpen, setIsWorkspaceSelectorOpen] = useState(false);
+
+  // Scroll-to-bottom state
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const isNearBottomRef = useRef(true);
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -194,6 +200,9 @@ export default function ThreadViewPage() {
           next.set(data.message_id, [...events, data]);
           return next;
         });
+        if (!isNearBottomRef.current) {
+          setHasNewMessages(true);
+        }
       } catch {
         // ignore parse errors
       }
@@ -274,9 +283,28 @@ export default function ThreadViewPage() {
     return () => evtSource.close();
   }, [thread?.machine_id, queryClient]);
 
-  // Auto-scroll to bottom on new messages or streaming events
+  // Track scroll position — is user near the bottom?
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const threshold = 150;
+      const nearBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight <
+        threshold;
+      isNearBottomRef.current = nearBottom;
+      setIsNearBottom(nearBottom);
+      if (nearBottom) setHasNewMessages(false);
+    };
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Auto-scroll only when user is already near bottom
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, streamingEvents]);
 
   const startEditingTitle = useCallback(() => {
@@ -483,6 +511,11 @@ export default function ThreadViewPage() {
     setSearchInput("");
     setSearchQuery("");
     searchInputRef.current?.focus();
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    setHasNewMessages(false);
   }, []);
 
   const handleExport = useCallback(async () => {
@@ -879,6 +912,23 @@ export default function ThreadViewPage() {
           )}
           <div ref={bottomRef} />
         </div>
+
+        {/* Scroll-to-bottom floating button */}
+        {!isNearBottom && !isSearchActive && (
+          <div className="pointer-events-none sticky bottom-3 flex justify-center">
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="bg-background pointer-events-auto relative flex size-8 items-center justify-center rounded-full border shadow-md transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              title="Scroll to bottom"
+            >
+              <ArrowDownIcon className="text-muted-foreground size-4" />
+              {hasNewMessages && (
+                <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-blue-500" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Input */}

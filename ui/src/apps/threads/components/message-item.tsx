@@ -1,7 +1,9 @@
 import {
   BotIcon,
+  CheckIcon,
   ChevronDownIcon,
   CircleXIcon,
+  ClipboardIcon,
   CodeIcon,
   Loader2Icon,
   OctagonAlertIcon,
@@ -9,7 +11,7 @@ import {
   TerminalIcon,
   UserIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 
@@ -377,6 +379,57 @@ function CompletedContent({ groups }: { groups: EventGroup[] }) {
   );
 }
 
+function extractCopyableText(
+  content: string,
+  metadata: Record<string, unknown> | null,
+): string {
+  if (!metadata) return content;
+  try {
+    const parsed = metadata as {
+      events?: Array<{ type: string; content: string }>;
+    };
+    if (!parsed.events || !Array.isArray(parsed.events)) return content;
+    const textParts: string[] = [];
+    for (const event of parsed.events) {
+      if (event.type === "text" && event.content) {
+        textParts.push(event.content);
+      }
+    }
+    return textParts.length > 0 ? textParts.join("") : content;
+  } catch {
+    return content;
+  }
+}
+
+function CopyMessageButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [text]);
+
+  if (!text) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="text-muted-foreground hover:text-foreground shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100 max-sm:opacity-100"
+      title={copied ? "Copied" : "Copy message"}
+    >
+      {copied ? (
+        <CheckIcon className="size-3.5" />
+      ) : (
+        <ClipboardIcon className="size-3.5" />
+      )}
+    </button>
+  );
+}
+
 function StatusIndicator({
   status,
   onCancel,
@@ -485,10 +538,17 @@ export function MessageItem({
     () => parseMetadataEvents(message.metadata),
     [message.metadata],
   );
+  const copyableText = useMemo(
+    () =>
+      !isUser && status === "completed"
+        ? extractCopyableText(message.content, message.metadata)
+        : "",
+    [isUser, status, message.content, message.metadata],
+  );
 
   if (isUser) {
     return (
-      <div className="flex gap-3">
+      <div className="group/msg flex gap-3">
         <div className="bg-muted flex size-6 shrink-0 items-center justify-center rounded-full">
           <UserIcon className="text-muted-foreground size-3" />
         </div>
@@ -501,6 +561,7 @@ export function MessageItem({
                 minute: "2-digit",
               })}
             </span>
+            <CopyMessageButton text={message.content} />
           </div>
           <p className="mt-1 text-sm leading-relaxed break-words whitespace-pre-wrap">
             {message.content}
@@ -512,7 +573,7 @@ export function MessageItem({
 
   // Assistant message
   return (
-    <div className="flex gap-3">
+    <div className="group/msg flex gap-3">
       <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-neutral-900 dark:bg-neutral-100">
         <BotIcon className="size-3 text-white dark:text-neutral-900" />
       </div>
@@ -530,6 +591,7 @@ export function MessageItem({
               minute: "2-digit",
             })}
           </span>
+          {status === "completed" && <CopyMessageButton text={copyableText} />}
         </div>
 
         <div className="mt-2">
