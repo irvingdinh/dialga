@@ -55,7 +55,7 @@ export class MessagesService {
   async list(
     threadId: string,
     userId: string,
-    options?: { limit?: number; before?: string },
+    options?: { limit?: number; before?: string; q?: string },
   ): Promise<{ messages: Message[]; has_more: boolean }> {
     await this.verifyThreadOwnership(threadId, userId);
 
@@ -64,6 +64,17 @@ export class MessagesService {
     const qb = this.messageRepository
       .createQueryBuilder('msg')
       .where('msg.thread_id = :threadId', { threadId });
+
+    // Full-text search mode: skip cursor pagination, search content
+    if (options?.q) {
+      qb.andWhere('msg.content LIKE :q', { q: `%${options.q}%` });
+      const messages = await qb
+        .orderBy('msg.created_at', 'ASC')
+        .addOrderBy('msg.id', 'ASC')
+        .take(limit)
+        .getMany();
+      return { messages, has_more: false };
+    }
 
     if (options?.before) {
       const cursor = await this.messageRepository.findOne({

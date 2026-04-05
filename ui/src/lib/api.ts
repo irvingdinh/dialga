@@ -190,10 +190,14 @@ export const api = {
   },
 
   messages: {
-    list: (threadId: string, params?: { limit?: number; before?: string }) => {
+    list: (
+      threadId: string,
+      params?: { limit?: number; before?: string; q?: string },
+    ) => {
       const sp = new URLSearchParams();
       if (params?.limit) sp.set("limit", String(params.limit));
       if (params?.before) sp.set("before", params.before);
+      if (params?.q) sp.set("q", params.q);
       const query = sp.toString() ? `?${sp.toString()}` : "";
       return request<{
         messages: Array<{

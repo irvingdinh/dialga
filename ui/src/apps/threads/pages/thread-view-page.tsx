@@ -13,8 +13,10 @@ import {
   LoaderIcon,
   MessageSquareIcon,
   PencilIcon,
+  SearchIcon,
   Trash2Icon,
   WifiOffIcon,
+  XIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -80,6 +82,13 @@ export default function ThreadViewPage() {
   );
   const [machineStatus, setMachineStatus] = useState<string | null>(null);
 
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
   const {
     data: thread,
     isLoading: threadLoading,
@@ -121,6 +130,24 @@ export default function ThreadViewPage() {
     enabled: !!threadId,
   });
 
+  // Search query — separate from paginated messages
+  const { data: searchData, isLoading: searchLoading } = useQuery({
+    queryKey: ["messages-search", threadId, searchQuery],
+    queryFn: () => api.messages.list(threadId!, { q: searchQuery }),
+    enabled: !!threadId && !!searchQuery,
+  });
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchInput]);
+
   // Flatten pages in chronological order (older pages last in array → reverse)
   const messages = useMemo(
     () =>
@@ -130,6 +157,11 @@ export default function ThreadViewPage() {
         .flatMap((p) => p.messages) ?? [],
     [messagesData],
   );
+
+  const isSearchActive = isSearchOpen && !!searchQuery;
+  const displayMessages = isSearchActive
+    ? (searchData?.messages ?? [])
+    : messages;
 
   // SSE for thread streaming events
   useEffect(() => {
@@ -419,6 +451,24 @@ export default function ThreadViewPage() {
     });
   }, [fetchNextPage]);
 
+  const toggleSearch = useCallback(() => {
+    setIsSearchOpen((prev) => {
+      if (!prev) {
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      } else {
+        setSearchInput("");
+        setSearchQuery("");
+      }
+      return !prev;
+    });
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput("");
+    setSearchQuery("");
+    searchInputRef.current?.focus();
+  }, []);
+
   const isOffline =
     machineStatus === "offline" ||
     (!machineStatus && machine?.status === "offline");
@@ -483,6 +533,15 @@ export default function ThreadViewPage() {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                onClick={toggleSearch}
+                className={`shrink-0 ${isSearchOpen ? "text-foreground" : "text-muted-foreground"}`}
+                title="Search messages"
+              >
+                <SearchIcon className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 onClick={handleToggleArchive}
                 className="text-muted-foreground shrink-0"
                 title={
@@ -509,6 +568,38 @@ export default function ThreadViewPage() {
           )}
         </div>
       </div>
+
+      {/* Search Bar */}
+      {isSearchOpen && (
+        <div className="border-b px-4 py-2">
+          <div className="mx-auto flex max-w-lg items-center gap-2">
+            <SearchIcon className="text-muted-foreground size-4 shrink-0" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") toggleSearch();
+              }}
+              placeholder="Search messages..."
+              className="placeholder:text-muted-foreground flex-1 bg-transparent text-sm outline-none"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            )}
+            {searchLoading && searchQuery && (
+              <LoaderIcon className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Banner */}
       {deleteState !== "idle" && (
@@ -596,20 +687,42 @@ export default function ThreadViewPage() {
           )}
 
           {/* Empty state */}
-          {messages.length === 0 && !isPageLoading && !isPageError && (
+          {displayMessages.length === 0 && !isPageLoading && !isPageError && (
             <div className="flex flex-col items-center px-4 py-16 text-center">
-              <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
-              <p className="text-muted-foreground text-sm">
-                No messages yet. Send one to get started.
+              {isSearchActive ? (
+                <>
+                  <SearchIcon className="text-muted-foreground/40 mb-3 size-8" />
+                  <p className="text-muted-foreground text-sm">
+                    No messages match &ldquo;{searchQuery}&rdquo;
+                  </p>
+                </>
+              ) : (
+                <>
+                  <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
+                  <p className="text-muted-foreground text-sm">
+                    No messages yet. Send one to get started.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Search result count */}
+          {isSearchActive && searchData && searchData.messages.length > 0 && (
+            <div className="px-4 pt-3 pb-0">
+              <p className="text-muted-foreground text-xs">
+                {searchData.messages.length} result
+                {searchData.messages.length !== 1 ? "s" : ""} for &ldquo;
+                {searchQuery}&rdquo;
               </p>
             </div>
           )}
 
           {/* Message list */}
-          {messages.length > 0 && (
+          {displayMessages.length > 0 && (
             <div className="flex flex-col gap-6 px-4 py-4">
-              {/* Load older button */}
-              {hasNextPage && (
+              {/* Load older button — only in normal (non-search) mode */}
+              {!isSearchActive && hasNextPage && (
                 <div className="flex justify-center">
                   <Button
                     variant="ghost"
@@ -628,16 +741,21 @@ export default function ThreadViewPage() {
                 </div>
               )}
 
-              {messages.map((msg) => {
+              {displayMessages.map((msg) => {
                 const effectiveStatus =
                   messageStatuses.get(msg.id) ?? msg.status;
                 return (
                   <MessageItem
                     key={msg.id}
                     message={msg}
-                    streamEvents={streamingEvents.get(msg.id)}
-                    overrideStatus={messageStatuses.get(msg.id)}
+                    streamEvents={
+                      isSearchActive ? undefined : streamingEvents.get(msg.id)
+                    }
+                    overrideStatus={
+                      isSearchActive ? undefined : messageStatuses.get(msg.id)
+                    }
                     onCancel={
+                      !isSearchActive &&
                       msg.role === "assistant" &&
                       effectiveStatus !== "completed" &&
                       effectiveStatus !== "cancelled" &&
@@ -647,6 +765,7 @@ export default function ThreadViewPage() {
                         : undefined
                     }
                     onRetry={
+                      !isSearchActive &&
                       msg.role === "assistant" &&
                       (effectiveStatus === "error" ||
                         effectiveStatus === "timed_out")

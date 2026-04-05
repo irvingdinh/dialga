@@ -39,12 +39,13 @@ export class MessagesController {
     @Param('threadId') threadId: string,
     @Query('limit') limitStr?: string,
     @Query('before') before?: string,
+    @Query('q') q?: string,
   ) {
     const limit = limitStr ? parseInt(limitStr, 10) : undefined;
     const { messages, has_more } = await this.messagesService.list(
       threadId,
       user.id,
-      { limit, before },
+      { limit, before, q },
     );
     return {
       messages: messages.map((m) => ({
