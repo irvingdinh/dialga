@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import { ProtectedRoute } from "@/apps/auth/protected-route";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 const LoginPage = lazy(() => import("./apps/auth/pages/login-page"));
 const MachinesPage = lazy(() => import("./apps/machines/pages/machines-page"));
@@ -18,12 +19,21 @@ export const Router = () => {
     <BrowserRouter>
       <Suspense>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/login"
+            element={
+              <ErrorBoundary>
+                <LoginPage />
+              </ErrorBoundary>
+            }
+          />
           <Route
             path="/machines"
             element={
               <ProtectedRoute>
-                <MachinesPage />
+                <ErrorBoundary>
+                  <MachinesPage />
+                </ErrorBoundary>
               </ProtectedRoute>
             }
           />
@@ -31,7 +41,9 @@ export const Router = () => {
             path="/machines/:machineId/settings"
             element={
               <ProtectedRoute>
-                <MachineSettingsPage />
+                <ErrorBoundary>
+                  <MachineSettingsPage />
+                </ErrorBoundary>
               </ProtectedRoute>
             }
           />
@@ -39,7 +51,9 @@ export const Router = () => {
             path="/machines/:machineId/threads"
             element={
               <ProtectedRoute>
-                <ThreadsPage />
+                <ErrorBoundary>
+                  <ThreadsPage />
+                </ErrorBoundary>
               </ProtectedRoute>
             }
           />
@@ -47,7 +61,9 @@ export const Router = () => {
             path="/threads/:threadId"
             element={
               <ProtectedRoute>
-                <ThreadViewPage />
+                <ErrorBoundary>
+                  <ThreadViewPage />
+                </ErrorBoundary>
               </ProtectedRoute>
             }
           />
