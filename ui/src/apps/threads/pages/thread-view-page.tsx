@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftIcon, WifiOffIcon } from "lucide-react";
+import { ArrowLeftIcon, PencilIcon, WifiOffIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
@@ -16,6 +16,11 @@ export default function ThreadViewPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Title editing state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Streaming state
   const [streamingEvents, setStreamingEvents] = useState<
@@ -144,6 +149,31 @@ export default function ThreadViewPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingEvents]);
 
+  const startEditingTitle = useCallback(() => {
+    setEditTitle(thread?.title ?? "");
+    setIsEditingTitle(true);
+    setTimeout(() => titleInputRef.current?.focus(), 0);
+  }, [thread?.title]);
+
+  const saveTitle = useCallback(async () => {
+    if (!threadId) return;
+    const trimmed = editTitle.trim();
+    setIsEditingTitle(false);
+    if (trimmed === (thread?.title ?? "")) return;
+    try {
+      await api.threads.update(threadId, {
+        title: trimmed || undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+    } catch {
+      // revert silently
+    }
+  }, [threadId, editTitle, thread?.title, queryClient]);
+
+  const cancelEditingTitle = useCallback(() => {
+    setIsEditingTitle(false);
+  }, []);
+
   const handleSend = useCallback(
     async (content: string, model?: string) => {
       if (!threadId) return;
@@ -230,9 +260,31 @@ export default function ThreadViewPage() {
             <ArrowLeftIcon className="size-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold tracking-tight">
-              {thread?.title ?? "New thread"}
-            </h1>
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveTitle();
+                  if (e.key === "Escape") cancelEditingTitle();
+                }}
+                onBlur={saveTitle}
+                className="bg-muted w-full rounded-md border px-2 py-0.5 text-sm font-semibold tracking-tight outline-none focus:ring-1 focus:ring-neutral-400"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={startEditingTitle}
+                className="group flex max-w-full items-center gap-1.5"
+              >
+                <h1 className="truncate text-sm font-semibold tracking-tight">
+                  {thread?.title ?? "New thread"}
+                </h1>
+                <PencilIcon className="text-muted-foreground size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+            )}
             {thread?.workspace_name && (
               <p className="text-muted-foreground truncate text-[11px]">
                 {thread.workspace_name}

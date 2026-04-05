@@ -70,6 +70,16 @@ export class ThreadsService {
     return thread;
   }
 
+  async update(
+    id: string,
+    userId: string,
+    data: { title?: string },
+  ): Promise<Thread> {
+    const thread = await this.findOne(id, userId);
+    if (data.title !== undefined) thread.title = data.title;
+    return this.threadRepository.save(thread);
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const thread = await this.findOne(id, userId);
     await this.messageRepository.delete({ thread_id: id });

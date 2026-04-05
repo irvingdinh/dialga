@@ -259,5 +259,19 @@ export const api = {
         created_at: string;
         updated_at: string;
       }>(`/api/threads/${threadId}`),
+    update: (threadId: string, data: { title?: string }) =>
+      request<{
+        id: string;
+        machine_id: string;
+        workspace_id: string | null;
+        workspace_name: string | null;
+        title: string | null;
+        status: string;
+        created_at: string;
+        updated_at: string;
+      }>(`/api/threads/${threadId}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
   },
 };

@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -20,6 +21,12 @@ class CreateThreadDto {
   @IsOptional()
   workspace_id?: string;
 
+  @IsString()
+  @IsOptional()
+  title?: string;
+}
+
+class UpdateThreadDto {
   @IsString()
   @IsOptional()
   title?: string;
@@ -74,6 +81,25 @@ export class ThreadsController {
   @Get('threads/:id')
   async findOne(@CurrentUser() user: User, @Param('id') id: string) {
     const t = await this.threadsService.findOne(id, user.id);
+    return {
+      id: t.id,
+      machine_id: t.machine_id,
+      workspace_id: t.workspace_id,
+      workspace_name: t.workspace?.name || null,
+      title: t.title,
+      status: t.status,
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+    };
+  }
+
+  @Patch('threads/:id')
+  async update(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdateThreadDto,
+  ) {
+    const t = await this.threadsService.update(id, user.id, dto);
     return {
       id: t.id,
       machine_id: t.machine_id,
