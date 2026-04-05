@@ -69,6 +69,71 @@ export class ThreadsService {
     return qb.getMany();
   }
 
+  async getListMetadata(threadIds: string[]): Promise<{
+    messageCounts: Record<string, number>;
+    latestMessages: Record<
+      string,
+      { role: string; content: string; status: string }
+    >;
+  }> {
+    if (threadIds.length === 0) {
+      return { messageCounts: {}, latestMessages: {} };
+    }
+
+    // Message counts per thread
+    const countResults: Array<{ thread_id: string; count: string }> =
+      await this.messageRepository
+        .createQueryBuilder('m')
+        .select('m.thread_id', 'thread_id')
+        .addSelect('COUNT(*)', 'count')
+        .where('m.thread_id IN (:...threadIds)', { threadIds })
+        .groupBy('m.thread_id')
+        .getRawMany();
+
+    const messageCounts: Record<string, number> = {};
+    for (const c of countResults) {
+      messageCounts[c.thread_id] = parseInt(c.count, 10);
+    }
+
+    // Latest message per thread (correlated subquery for max created_at)
+    const latestResults: Array<{
+      thread_id: string;
+      role: string;
+      content: string;
+      status: string;
+    }> = await this.messageRepository
+      .createQueryBuilder('m')
+      .select('m.thread_id', 'thread_id')
+      .addSelect('m.role', 'role')
+      .addSelect('SUBSTRING(m.content, 1, 120)', 'content')
+      .addSelect('m.status', 'status')
+      .where('m.thread_id IN (:...threadIds)', { threadIds })
+      .andWhere((qb) => {
+        const sub = qb
+          .subQuery()
+          .select('MAX(m2.created_at)')
+          .from(Message, 'm2')
+          .where('m2.thread_id = m.thread_id')
+          .getQuery();
+        return `m.created_at = ${sub}`;
+      })
+      .getRawMany();
+
+    const latestMessages: Record<
+      string,
+      { role: string; content: string; status: string }
+    > = {};
+    for (const msg of latestResults) {
+      latestMessages[msg.thread_id] = {
+        role: msg.role,
+        content: msg.content || '',
+        status: msg.status,
+      };
+    }
+
+    return { messageCounts, latestMessages };
+  }
+
   async create(
     machineId: string,
     userId: string,

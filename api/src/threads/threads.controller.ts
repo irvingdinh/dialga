@@ -56,6 +56,9 @@ export class ThreadsController {
       status,
       q,
     );
+    const { messageCounts, latestMessages } =
+      await this.threadsService.getListMetadata(threads.map((t) => t.id));
+
     return threads.map((t) => ({
       id: t.id,
       machine_id: t.machine_id,
@@ -63,6 +66,8 @@ export class ThreadsController {
       workspace_name: t.workspace?.name || null,
       title: t.title,
       status: t.status,
+      message_count: messageCounts[t.id] || 0,
+      latest_message: latestMessages[t.id] || null,
       created_at: t.created_at,
       updated_at: t.updated_at,
     }));

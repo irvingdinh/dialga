@@ -249,6 +249,12 @@ export const api = {
           workspace_name: string | null;
           title: string | null;
           status: string;
+          message_count: number;
+          latest_message: {
+            role: string;
+            content: string;
+            status: string;
+          } | null;
           created_at: string;
           updated_at: string;
         }>

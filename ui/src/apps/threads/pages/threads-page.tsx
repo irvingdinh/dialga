@@ -58,6 +58,41 @@ function ThreadListSkeleton() {
   );
 }
 
+function LatestMessagePreview({
+  message,
+}: {
+  message: { role: string; content: string; status: string };
+}) {
+  if (message.role === "assistant") {
+    if (message.status === "running") {
+      return <span className="italic">Running...</span>;
+    }
+    if (message.status === "queued") {
+      return <span className="italic">Waiting in queue...</span>;
+    }
+    if (message.status === "error") {
+      return <span className="text-red-500 dark:text-red-400">Error</span>;
+    }
+    if (message.status === "timed_out") {
+      return (
+        <span className="text-amber-600 dark:text-amber-400">Timed out</span>
+      );
+    }
+    if (message.status === "cancelled") {
+      return <span className="italic">Cancelled</span>;
+    }
+  }
+
+  const prefix = message.role === "user" ? "You: " : "";
+  const text = message.content.replace(/\n/g, " ").trim();
+  return (
+    <span>
+      {prefix && <span className="text-muted-foreground/70">{prefix}</span>}
+      {text || <span className="italic">Empty message</span>}
+    </span>
+  );
+}
+
 export default function ThreadsPage() {
   const { machineId } = useParams<{ machineId: string }>();
   const navigate = useNavigate();
@@ -390,6 +425,13 @@ export default function ThreadsPage() {
                       <div className="truncate text-sm font-medium">
                         {thread.title ?? "New thread"}
                       </div>
+                      {thread.latest_message && (
+                        <div className="text-muted-foreground mt-0.5 truncate text-xs">
+                          <LatestMessagePreview
+                            message={thread.latest_message}
+                          />
+                        </div>
+                      )}
                       <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
                         {thread.status === "archived" && (
                           <>
@@ -407,6 +449,15 @@ export default function ThreadsPage() {
                             <span className="flex items-center gap-1">
                               <FolderIcon className="size-3" />
                               {thread.workspace_name}
+                            </span>
+                            <span>·</span>
+                          </>
+                        )}
+                        {thread.message_count > 0 && (
+                          <>
+                            <span>
+                              {thread.message_count}{" "}
+                              {thread.message_count === 1 ? "msg" : "msgs"}
                             </span>
                             <span>·</span>
                           </>

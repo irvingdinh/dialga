@@ -45,7 +45,7 @@ export class MessagesService {
   ): Promise<Thread> {
     const thread = await this.threadRepository.findOne({
       where: { id: threadId },
-      relations: ['machine'],
+      relations: ['machine', 'workspace'],
     });
     if (!thread) throw new NotFoundException('Thread not found');
     if (thread.machine.user_id !== userId) throw new ForbiddenException();
