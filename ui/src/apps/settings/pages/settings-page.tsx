@@ -1,5 +1,7 @@
 import {
   ArrowLeftIcon,
+  BellIcon,
+  BellOffIcon,
   CheckIcon,
   LoaderIcon,
   MonitorIcon,
@@ -16,6 +18,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { api, ApiError } from "@/lib/api";
+import {
+  getBrowserNotificationsEnabled,
+  setBrowserNotificationsEnabled,
+} from "@/lib/notifications";
 import { useTheme } from "@/lib/theme";
 
 export default function SettingsPage() {
@@ -272,6 +278,11 @@ export default function SettingsPage() {
 
       <Separator className="my-8" />
 
+      {/* Notifications Section */}
+      <NotificationsSection />
+
+      <Separator className="my-8" />
+
       {/* Account Section */}
       <div className="mb-8">
         <h2 className="text-sm font-medium">Account</h2>
@@ -321,5 +332,78 @@ function ThemeButton({
       {icon}
       {label}
     </button>
+  );
+}
+
+function NotificationsSection() {
+  const [enabled, setEnabled] = useState(getBrowserNotificationsEnabled);
+  const supportsNotifications = "Notification" in window;
+  const permission = supportsNotifications ? Notification.permission : "denied";
+
+  const handleToggle = useCallback(
+    async (value: boolean) => {
+      if (
+        value &&
+        supportsNotifications &&
+        Notification.permission === "default"
+      ) {
+        const result = await Notification.requestPermission();
+        if (result === "denied") {
+          toast.error("Notifications blocked by your browser");
+          return;
+        }
+      }
+      setBrowserNotificationsEnabled(value);
+      setEnabled(value);
+    },
+    [supportsNotifications],
+  );
+
+  return (
+    <div>
+      <h2 className="text-sm font-medium">Notifications</h2>
+      <p className="text-muted-foreground mt-0.5 text-xs">
+        Get notified when tasks finish
+      </p>
+
+      <div className="mt-4 space-y-3">
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleToggle(true)}
+            className={`flex flex-1 flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-xs transition-colors ${
+              enabled
+                ? "border-foreground/20 bg-muted font-medium"
+                : "hover:bg-muted/50 text-muted-foreground border-transparent"
+            }`}
+          >
+            <BellIcon className="size-4" />
+            Enabled
+          </button>
+          <button
+            onClick={() => handleToggle(false)}
+            className={`flex flex-1 flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-xs transition-colors ${
+              !enabled
+                ? "border-foreground/20 bg-muted font-medium"
+                : "hover:bg-muted/50 text-muted-foreground border-transparent"
+            }`}
+          >
+            <BellOffIcon className="size-4" />
+            Disabled
+          </button>
+        </div>
+
+        {supportsNotifications && permission === "denied" && enabled && (
+          <p className="text-muted-foreground text-xs">
+            Browser notifications are blocked. Enable them in your browser
+            settings for this site.
+          </p>
+        )}
+
+        <p className="text-muted-foreground text-xs">
+          Browser notifications appear when tasks complete, fail, or time out
+          while the tab is in the background.
+        </p>
+      </div>
+    </div>
   );
 }
