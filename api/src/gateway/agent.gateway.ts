@@ -110,6 +110,9 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
       case 'git:status:result':
       case 'git:diff:result':
       case 'git:log:result':
+      case 'git:stage:result':
+      case 'git:unstage:result':
+      case 'git:commit:result':
         this.gatewayService.handleRequestResult(
           parsed.data as { request_id: string } & Record<string, unknown>,
         );

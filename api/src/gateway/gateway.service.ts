@@ -580,6 +580,75 @@ export class GatewayService {
     return { entries: result.entries, error: result.error };
   }
 
+  async gitStage(
+    machineId: string,
+    dirPath: string,
+    files: string[],
+  ): Promise<{ success: boolean; error?: string }> {
+    const result = (await this.sendRequest(machineId, 'git:stage', {
+      path: dirPath,
+      files,
+    })) as {
+      request_id: string;
+      success: boolean;
+      error?: string;
+    };
+    return { success: result.success, error: result.error };
+  }
+
+  async gitUnstage(
+    machineId: string,
+    dirPath: string,
+    files: string[],
+  ): Promise<{ success: boolean; error?: string }> {
+    const result = (await this.sendRequest(machineId, 'git:unstage', {
+      path: dirPath,
+      files,
+    })) as {
+      request_id: string;
+      success: boolean;
+      error?: string;
+    };
+    return { success: result.success, error: result.error };
+  }
+
+  async gitCommit(
+    machineId: string,
+    dirPath: string,
+    message: string,
+  ): Promise<{
+    success: boolean;
+    commit?: {
+      hash: string;
+      short_hash: string;
+      author: string;
+      date: string;
+      message: string;
+    };
+    error?: string;
+  }> {
+    const result = (await this.sendRequest(machineId, 'git:commit', {
+      path: dirPath,
+      message,
+    })) as {
+      request_id: string;
+      success: boolean;
+      commit?: {
+        hash: string;
+        short_hash: string;
+        author: string;
+        date: string;
+        message: string;
+      };
+      error?: string;
+    };
+    return {
+      success: result.success,
+      commit: result.commit,
+      error: result.error,
+    };
+  }
+
   async dispatchQueuedMessages(machineId: string): Promise<void> {
     // Find all queued assistant messages for threads on this machine
     const queuedMessages = await this.messageRepository

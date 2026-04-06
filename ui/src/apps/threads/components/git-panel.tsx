@@ -11,6 +11,7 @@ import {
   LoaderIcon,
   PencilIcon,
   RefreshCwIcon,
+  SendIcon,
   XIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -243,19 +244,29 @@ function DiffViewer({
   );
 }
 
-// Deduplicate git files — combine staged + unstaged entries for same path
-function deduplicateFiles(files: GitFile[]): GitFile[] {
-  const seen = new Map<string, GitFile>();
-  for (const f of files) {
-    const existing = seen.get(f.path);
+// Build a deduplicated file list with staging info
+interface DeduplicatedFile {
+  path: string;
+  status: string;
+  staged: boolean;
+}
+
+function deduplicateFiles(rawFiles: GitFile[]): DeduplicatedFile[] {
+  const map = new Map<string, { status: string; staged: boolean }>();
+  for (const f of rawFiles) {
+    const existing = map.get(f.path);
     if (!existing) {
-      seen.set(f.path, f);
-    } else if (f.staged && !existing.staged) {
-      // Prefer staged entry if we have both
-      seen.set(f.path, f);
+      map.set(f.path, { status: f.status, staged: f.staged });
+    } else if (f.staged) {
+      // If file has a staged entry, mark as staged and use staged status
+      map.set(f.path, { status: f.status, staged: true });
     }
   }
-  return Array.from(seen.values());
+  return Array.from(map.entries()).map(([path, info]) => ({
+    path,
+    status: info.status,
+    staged: info.staged,
+  }));
 }
 
 export function GitPanel({
@@ -263,13 +274,20 @@ export function GitPanel({
   workingDirectory,
   onClose,
 }: GitPanelProps) {
-  const [files, setFiles] = useState<GitFile[]>([]);
+  const [files, setFiles] = useState<DeduplicatedFile[]>([]);
   const [branch, setBranch] = useState("");
   const [log, setLog] = useState<GitLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [viewingDiff, setViewingDiff] = useState<string | null>(null);
   const [tab, setTab] = useState<"changes" | "log">("changes");
+  const [commitMessage, setCommitMessage] = useState("");
+  const [committing, setCommitting] = useState(false);
+  const [commitError, setCommitError] = useState("");
+  const [stagingFile, setStagingFile] = useState<string | null>(null);
+
+  const stagedFiles = files.filter((f) => f.staged);
+  const unstagedFiles = files.filter((f) => !f.staged);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -302,6 +320,97 @@ export function GitPanel({
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
+
+  const handleStage = useCallback(
+    async (filePaths: string[]) => {
+      setStagingFile(filePaths[0]);
+      try {
+        const result = await api.git.stage(
+          machineId,
+          workingDirectory,
+          filePaths,
+        );
+        if (result.error) {
+          setCommitError(result.error);
+          return;
+        }
+        // Optimistically update local state
+        setFiles((prev) =>
+          prev.map((f) =>
+            filePaths.includes(f.path) ? { ...f, staged: true } : f,
+          ),
+        );
+      } catch (err) {
+        setCommitError(
+          err instanceof ApiError ? err.message : "Failed to stage files",
+        );
+      } finally {
+        setStagingFile(null);
+      }
+    },
+    [machineId, workingDirectory],
+  );
+
+  const handleUnstage = useCallback(
+    async (filePaths: string[]) => {
+      setStagingFile(filePaths[0]);
+      try {
+        const result = await api.git.unstage(
+          machineId,
+          workingDirectory,
+          filePaths,
+        );
+        if (result.error) {
+          setCommitError(result.error);
+          return;
+        }
+        setFiles((prev) =>
+          prev.map((f) =>
+            filePaths.includes(f.path) ? { ...f, staged: false } : f,
+          ),
+        );
+      } catch (err) {
+        setCommitError(
+          err instanceof ApiError ? err.message : "Failed to unstage files",
+        );
+      } finally {
+        setStagingFile(null);
+      }
+    },
+    [machineId, workingDirectory],
+  );
+
+  const handleCommit = useCallback(async () => {
+    if (!commitMessage.trim() || stagedFiles.length === 0) return;
+    setCommitting(true);
+    setCommitError("");
+    try {
+      const result = await api.git.commit(
+        machineId,
+        workingDirectory,
+        commitMessage.trim(),
+      );
+      if (!result.success) {
+        setCommitError(result.error ?? "Commit failed");
+        return;
+      }
+      // Clear commit form and refresh
+      setCommitMessage("");
+      await fetchStatus();
+    } catch (err) {
+      setCommitError(
+        err instanceof ApiError ? err.message : "Failed to commit",
+      );
+    } finally {
+      setCommitting(false);
+    }
+  }, [
+    commitMessage,
+    stagedFiles.length,
+    machineId,
+    workingDirectory,
+    fetchStatus,
+  ]);
 
   // If viewing a diff, show the diff viewer
   if (viewingDiff) {
@@ -407,21 +516,100 @@ export function GitPanel({
               Working tree clean
             </div>
           ) : (
-            <div>
-              {files.map((file) => (
-                <button
-                  key={`${file.path}-${file.staged}`}
-                  type="button"
-                  onClick={() => setViewingDiff(file.path)}
-                  className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors"
-                >
-                  <StatusIcon status={file.status} />
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                    {file.path}
-                  </span>
-                  <StatusBadge status={file.status} staged={file.staged} />
-                </button>
-              ))}
+            <div className="flex h-full flex-col">
+              {/* Staged section */}
+              {stagedFiles.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between px-3 pt-2 pb-1">
+                    <span className="text-[10px] font-semibold tracking-wider text-green-600 uppercase dark:text-green-400">
+                      Staged ({stagedFiles.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUnstage(stagedFiles.map((f) => f.path))
+                      }
+                      className="text-muted-foreground hover:text-foreground text-[10px] transition-colors"
+                    >
+                      Unstage all
+                    </button>
+                  </div>
+                  {stagedFiles.map((file) => (
+                    <div
+                      key={`staged-${file.path}`}
+                      className="group/file hover:bg-muted flex w-full items-center gap-1.5 px-3 py-1 text-left transition-colors"
+                    >
+                      <button
+                        type="button"
+                        title="Unstage file"
+                        onClick={() => handleUnstage([file.path])}
+                        disabled={stagingFile === file.path}
+                        className="flex size-4 shrink-0 items-center justify-center rounded border border-green-500 bg-green-500 text-white transition-colors hover:bg-green-600 disabled:opacity-50 dark:border-green-600 dark:bg-green-600 dark:hover:bg-green-700"
+                      >
+                        <CheckIcon className="size-2.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewingDiff(file.path)}
+                        className="flex min-w-0 flex-1 items-center gap-1.5"
+                      >
+                        <StatusIcon status={file.status} />
+                        <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                          {file.path}
+                        </span>
+                      </button>
+                      <StatusBadge status={file.status} staged={true} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Unstaged section */}
+              {unstagedFiles.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between px-3 pt-2 pb-1">
+                    <span className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+                      Changes ({unstagedFiles.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleStage(unstagedFiles.map((f) => f.path))
+                      }
+                      className="text-muted-foreground hover:text-foreground text-[10px] transition-colors"
+                    >
+                      Stage all
+                    </button>
+                  </div>
+                  {unstagedFiles.map((file) => (
+                    <div
+                      key={`unstaged-${file.path}`}
+                      className="group/file hover:bg-muted flex w-full items-center gap-1.5 px-3 py-1 text-left transition-colors"
+                    >
+                      <button
+                        type="button"
+                        title="Stage file"
+                        onClick={() => handleStage([file.path])}
+                        disabled={stagingFile === file.path}
+                        className="flex size-4 shrink-0 items-center justify-center rounded border transition-colors hover:border-green-500 hover:bg-green-50 disabled:opacity-50 dark:hover:border-green-600 dark:hover:bg-green-950"
+                      >
+                        <span className="size-0" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewingDiff(file.path)}
+                        className="flex min-w-0 flex-1 items-center gap-1.5"
+                      >
+                        <StatusIcon status={file.status} />
+                        <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                          {file.path}
+                        </span>
+                      </button>
+                      <StatusBadge status={file.status} staged={false} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )
         ) : /* Log tab */
@@ -452,6 +640,48 @@ export function GitPanel({
           </div>
         )}
       </div>
+
+      {/* Commit form — visible on Changes tab when there are staged files */}
+      {tab === "changes" && !loading && !error && stagedFiles.length > 0 && (
+        <div className="border-t px-3 py-2">
+          {commitError && (
+            <p className="text-destructive mb-1.5 text-[11px]">{commitError}</p>
+          )}
+          <div className="flex items-start gap-2">
+            <textarea
+              value={commitMessage}
+              onChange={(e) => setCommitMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  handleCommit();
+                }
+              }}
+              placeholder="Commit message..."
+              rows={2}
+              className="bg-muted min-h-[3rem] min-w-0 flex-1 resize-none rounded-md border px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-600"
+            />
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleCommit}
+              disabled={committing || !commitMessage.trim()}
+              title={`Commit ${stagedFiles.length} file${stagedFiles.length > 1 ? "s" : ""} (${navigator.platform.includes("Mac") ? "⌘" : "Ctrl"}+Enter)`}
+              className="shrink-0"
+            >
+              {committing ? (
+                <LoaderIcon className="size-3 animate-spin" />
+              ) : (
+                <SendIcon className="size-3" />
+              )}
+              Commit
+            </Button>
+          </div>
+          <p className="text-muted-foreground mt-1 text-[10px]">
+            {stagedFiles.length} file{stagedFiles.length > 1 ? "s" : ""} staged
+          </p>
+        </div>
+      )}
     </div>
   );
 }

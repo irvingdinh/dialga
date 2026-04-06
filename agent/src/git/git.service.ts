@@ -19,6 +19,18 @@ interface GitLogRequest extends GitRequest {
   limit?: number;
 }
 
+interface GitStageRequest {
+  request_id: string;
+  path: string;
+  files: string[];
+}
+
+interface GitCommitRequest {
+  request_id: string;
+  path: string;
+  message: string;
+}
+
 interface GitStatusEntry {
   status: string;
   path: string;
@@ -193,6 +205,112 @@ export class GitService {
       this.ws.send('git:log:result', {
         request_id: data.request_id,
         entries: [],
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  @OnEvent('ws.git:stage')
+  handleGitStage(data: GitStageRequest): void {
+    const dirPath = data.path;
+
+    try {
+      const resolved = path.resolve(dirPath);
+
+      for (const file of data.files) {
+        this.execGit(`git add -- ${JSON.stringify(file)}`, resolved);
+      }
+
+      this.ws.send('git:stage:result', {
+        request_id: data.request_id,
+        success: true,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `git:stage failed for ${dirPath}: ${(err as Error).message}`,
+      );
+      this.ws.send('git:stage:result', {
+        request_id: data.request_id,
+        success: false,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  @OnEvent('ws.git:unstage')
+  handleGitUnstage(data: GitStageRequest): void {
+    const dirPath = data.path;
+
+    try {
+      const resolved = path.resolve(dirPath);
+
+      for (const file of data.files) {
+        this.execGit(`git reset HEAD -- ${JSON.stringify(file)}`, resolved);
+      }
+
+      this.ws.send('git:unstage:result', {
+        request_id: data.request_id,
+        success: true,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `git:unstage failed for ${dirPath}: ${(err as Error).message}`,
+      );
+      this.ws.send('git:unstage:result', {
+        request_id: data.request_id,
+        success: false,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  @OnEvent('ws.git:commit')
+  handleGitCommit(data: GitCommitRequest): void {
+    const dirPath = data.path;
+
+    try {
+      const resolved = path.resolve(dirPath);
+
+      // Verify there are staged changes
+      const staged = this.execGit('git diff --cached --name-only', resolved);
+      if (!staged) {
+        this.ws.send('git:commit:result', {
+          request_id: data.request_id,
+          success: false,
+          error: 'Nothing staged to commit',
+        });
+        return;
+      }
+
+      // Commit with the provided message
+      const escapedMessage = data.message.replace(/'/g, "'\\''");
+      this.execGit(`git commit -m '${escapedMessage}'`, resolved);
+
+      // Return the new commit info
+      const logOutput = this.execGit(
+        'git log --format=%H%n%h%n%an%n%aI%n%s -n 1',
+        resolved,
+      );
+      const lines = logOutput.split('\n');
+
+      this.ws.send('git:commit:result', {
+        request_id: data.request_id,
+        success: true,
+        commit: {
+          hash: lines[0],
+          short_hash: lines[1],
+          author: lines[2],
+          date: lines[3],
+          message: lines[4],
+        },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `git:commit failed for ${dirPath}: ${(err as Error).message}`,
+      );
+      this.ws.send('git:commit:result', {
+        request_id: data.request_id,
+        success: false,
         error: (err as Error).message,
       });
     }

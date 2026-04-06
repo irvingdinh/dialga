@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { IsOptional, IsString } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 import { CurrentUser } from '../core/decorators/current-user.decorator.js';
 import type { User } from '../core/entities/index.js';
@@ -42,6 +42,26 @@ class UpdateMachineDto {
   @IsString()
   @IsOptional()
   default_model?: string;
+}
+
+class GitStageDto {
+  @IsString()
+  @IsNotEmpty()
+  path!: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  files!: string[];
+}
+
+class GitCommitDto {
+  @IsString()
+  @IsNotEmpty()
+  path!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  message!: string;
 }
 
 @Controller('api/machines')
@@ -192,5 +212,35 @@ export class MachinesController {
       dirPath,
       limit ? parseInt(limit, 10) : undefined,
     );
+  }
+
+  @Post(':machineId/git/stage')
+  async gitStage(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Body() dto: GitStageDto,
+  ) {
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.gitStage(machineId, dto.path, dto.files);
+  }
+
+  @Post(':machineId/git/unstage')
+  async gitUnstage(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Body() dto: GitStageDto,
+  ) {
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.gitUnstage(machineId, dto.path, dto.files);
+  }
+
+  @Post(':machineId/git/commit')
+  async gitCommit(
+    @CurrentUser() user: User,
+    @Param('machineId') machineId: string,
+    @Body() dto: GitCommitDto,
+  ) {
+    await this.machinesService.findOne(machineId, user.id);
+    return this.gatewayService.gitCommit(machineId, dto.path, dto.message);
   }
 }

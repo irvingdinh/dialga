@@ -164,6 +164,31 @@ export const api = {
         error?: string;
       }>(`/api/machines/${machineId}/git/log?${sp.toString()}`);
     },
+    stage: (machineId: string, path: string, files: string[]) =>
+      request<{ success: boolean; error?: string }>(
+        `/api/machines/${machineId}/git/stage`,
+        { method: "POST", body: JSON.stringify({ path, files }) },
+      ),
+    unstage: (machineId: string, path: string, files: string[]) =>
+      request<{ success: boolean; error?: string }>(
+        `/api/machines/${machineId}/git/unstage`,
+        { method: "POST", body: JSON.stringify({ path, files }) },
+      ),
+    commit: (machineId: string, path: string, message: string) =>
+      request<{
+        success: boolean;
+        commit?: {
+          hash: string;
+          short_hash: string;
+          author: string;
+          date: string;
+          message: string;
+        };
+        error?: string;
+      }>(`/api/machines/${machineId}/git/commit`, {
+        method: "POST",
+        body: JSON.stringify({ path, message }),
+      }),
   },
 
   workspaces: {
