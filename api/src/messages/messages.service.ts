@@ -335,6 +335,70 @@ export class MessagesService {
     return rows;
   }
 
+  async listRecent(
+    userId: string,
+    limit = 20,
+  ): Promise<
+    Array<{
+      message_id: string;
+      thread_id: string;
+      thread_title: string | null;
+      machine_id: string;
+      machine_name: string;
+      workspace_name: string | null;
+      status: string;
+      model: string | null;
+      content: string | null;
+      created_at: Date;
+      started_at: Date | null;
+      completed_at: Date | null;
+    }>
+  > {
+    const rows = await this.messageRepository
+      .createQueryBuilder('msg')
+      .innerJoin('msg.thread', 'thread')
+      .innerJoin('thread.machine', 'machine')
+      .leftJoin('thread.workspace', 'workspace')
+      .select([
+        'msg.id AS message_id',
+        'thread.id AS thread_id',
+        'thread.title AS thread_title',
+        'machine.id AS machine_id',
+        'machine.name AS machine_name',
+        'workspace.name AS workspace_name',
+        'msg.status AS status',
+        'msg.model AS model',
+        'SUBSTRING(msg.content, 1, 200) AS content',
+        'msg.created_at AS created_at',
+        'msg.started_at AS started_at',
+        'msg.completed_at AS completed_at',
+      ])
+      .where('msg.role = :role', { role: 'assistant' })
+      .andWhere('msg.status IN (:...statuses)', {
+        statuses: ['completed', 'error', 'cancelled', 'timed_out'],
+      })
+      .andWhere('machine.user_id = :userId', { userId })
+      .andWhere('machine.deleted_at IS NULL')
+      .orderBy('msg.completed_at', 'DESC')
+      .limit(limit)
+      .getRawMany<{
+        message_id: string;
+        thread_id: string;
+        thread_title: string | null;
+        machine_id: string;
+        machine_name: string;
+        workspace_name: string | null;
+        status: string;
+        model: string | null;
+        content: string | null;
+        created_at: Date;
+        started_at: Date | null;
+        completed_at: Date | null;
+      }>();
+
+    return rows;
+  }
+
   async getAsJsonl(threadId: string): Promise<string> {
     const messages = await this.messageRepository.find({
       where: { thread_id: threadId },

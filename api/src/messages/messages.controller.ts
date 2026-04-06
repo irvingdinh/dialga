@@ -39,6 +39,16 @@ export class MessagesController {
     return { tasks };
   }
 
+  @Get('activity/recent')
+  async listRecent(
+    @CurrentUser() user: User,
+    @Query('limit') limitStr?: string,
+  ) {
+    const limit = limitStr ? Math.min(parseInt(limitStr, 10), 50) : 20;
+    const items = await this.messagesService.listRecent(user.id, limit);
+    return { items };
+  }
+
   @Get('threads/:threadId/messages')
   async list(
     @CurrentUser() user: User,
