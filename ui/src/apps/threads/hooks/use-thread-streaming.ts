@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { type MutableRefObject, useEffect, useMemo, useState } from "react";
 
 import type { StreamEvent } from "@/apps/threads/components/message-item";
+import { useMachineStatusEvent } from "@/lib/machine-status";
 
 interface Message {
   id: string;
@@ -97,35 +98,15 @@ export function useThreadStreaming(
     return () => evtSource.close();
   }, [threadId, queryClient, markAsRead, isNearBottomRef]);
 
-  // SSE for machine status
-  useEffect(() => {
-    if (!machineId) return;
-
-    const evtSource = new EventSource("/api/machines/stream");
-
-    evtSource.addEventListener("machine:status", (e) => {
-      try {
-        const data = JSON.parse(e.data) as {
-          machine_id: string;
-          status: string;
-        };
-        if (data.machine_id === machineId) {
-          setMachineStatus(data.status);
-          queryClient.invalidateQueries({
-            queryKey: ["machine", machineId],
-          });
-        }
-      } catch {
-        // ignore
-      }
-    });
-
-    evtSource.onerror = () => {
-      // SSE auto-reconnects
-    };
-
-    return () => evtSource.close();
-  }, [machineId, queryClient]);
+  // Shared SSE for machine status
+  useMachineStatusEvent((data) => {
+    if (data.machine_id === machineId) {
+      setMachineStatus(data.status);
+      queryClient.invalidateQueries({
+        queryKey: ["machine", machineId],
+      });
+    }
+  });
 
   // Extract partial metadata events for running messages (page refresh recovery)
   const partialEvents = useMemo(() => {

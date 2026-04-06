@@ -7,7 +7,7 @@ import {
   PlusIcon,
   SettingsIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useAuth } from "@/apps/auth/auth-provider";
@@ -23,6 +23,7 @@ import { useUnreadCounts } from "@/apps/machines/hooks/use-unread-counts";
 import { QuickNewThreadDialog } from "@/components/quick-new-thread-dialog";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { useMachineStatusEvent } from "@/lib/machine-status";
 
 export default function MachinesPage() {
   const { user } = useAuth();
@@ -44,47 +45,28 @@ export default function MachinesPage() {
 
   const unreadCounts = useUnreadCounts(machines);
 
-  // SSE for real-time machine status updates
-  useEffect(() => {
-    const evtSource = new EventSource("/api/machines/stream");
-
-    evtSource.addEventListener("machine:status", (e) => {
-      try {
-        const data = JSON.parse(e.data) as {
-          machine_id: string;
+  // Shared SSE for real-time machine status updates
+  useMachineStatusEvent((data) => {
+    queryClient.setQueryData(
+      ["machines"],
+      (
+        old: Array<{
+          id: string;
           status: string;
-          last_seen_at: string;
-        };
-        queryClient.setQueryData(
-          ["machines"],
-          (
-            old: Array<{
-              id: string;
-              status: string;
-              last_seen_at: string | null;
-            }>,
-          ) =>
-            old?.map((m) =>
-              m.id === data.machine_id
-                ? {
-                    ...m,
-                    status: data.status,
-                    last_seen_at: data.last_seen_at,
-                  }
-                : m,
-            ),
-        );
-      } catch {
-        // ignore parse errors
-      }
-    });
-
-    evtSource.onerror = () => {
-      // SSE will auto-reconnect
-    };
-
-    return () => evtSource.close();
-  }, [queryClient]);
+          last_seen_at: string | null;
+        }>,
+      ) =>
+        old?.map((m) =>
+          m.id === data.machine_id
+            ? {
+                ...m,
+                status: data.status,
+                last_seen_at: data.last_seen_at,
+              }
+            : m,
+        ),
+    );
+  });
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">

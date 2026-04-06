@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError, type HealthInfo } from "@/lib/api";
+import { useMachineStatusEvent } from "@/lib/machine-status";
 
 function SettingsSkeleton() {
   return (
@@ -115,23 +116,12 @@ export default function MachineSettingsPage() {
     [machineId, isDirty, name, agent, model, queryClient],
   );
 
-  // SSE for machine status
-  useEffect(() => {
-    const evtSource = new EventSource("/api/machines/stream");
-
-    evtSource.addEventListener("machine:status", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.machine_id === machineId) {
-          queryClient.invalidateQueries({ queryKey: ["machine", machineId] });
-        }
-      } catch {
-        // ignore
-      }
-    });
-
-    return () => evtSource.close();
-  }, [machineId, queryClient]);
+  // Shared SSE for machine status
+  useMachineStatusEvent((data) => {
+    if (data.machine_id === machineId) {
+      queryClient.invalidateQueries({ queryKey: ["machine", machineId] });
+    }
+  });
 
   function formatDate(dateStr: string | null) {
     if (!dateStr) return "Never";

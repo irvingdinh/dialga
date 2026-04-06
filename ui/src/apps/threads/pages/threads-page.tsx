@@ -24,8 +24,10 @@ import {
 } from "@/apps/threads/components/thread-list-shared";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
+import { useMachineStatusEvent } from "@/lib/machine-status";
 import { useUnread } from "@/lib/unread";
 import { usePageShortcuts } from "@/lib/use-page-shortcuts";
+import { useThreadUpdates } from "@/lib/use-thread-updates";
 
 export default function ThreadsPage() {
   const { machineId } = useParams<{ machineId: string }>();
@@ -132,46 +134,17 @@ export default function ThreadsPage() {
     enabled: !!machineId,
   });
 
-  // SSE for real-time thread updates
-  useEffect(() => {
-    if (!machineId) return;
+  // Shared SSE for real-time thread updates
+  useThreadUpdates(machineId, () => {
+    queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
+  });
 
-    const evtSource = new EventSource(
-      `/api/machines/${machineId}/threads/stream`,
-    );
-
-    evtSource.addEventListener("thread:update", () => {
-      queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
-    });
-
-    evtSource.onerror = () => {
-      // SSE will auto-reconnect
-    };
-
-    return () => evtSource.close();
-  }, [machineId, queryClient]);
-
-  // SSE for machine status
-  useEffect(() => {
-    const evtSource = new EventSource("/api/machines/stream");
-
-    evtSource.addEventListener("machine:status", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.machine_id === machineId) {
-          queryClient.invalidateQueries({ queryKey: ["machine", machineId] });
-        }
-      } catch {
-        // ignore parse errors
-      }
-    });
-
-    evtSource.onerror = () => {
-      // SSE will auto-reconnect
-    };
-
-    return () => evtSource.close();
-  }, [machineId, queryClient]);
+  // Shared SSE for machine status
+  useMachineStatusEvent((data) => {
+    if (data.machine_id === machineId) {
+      queryClient.invalidateQueries({ queryKey: ["machine", machineId] });
+    }
+  });
 
   const filteredThreads = useMemo(() => {
     if (!threads) return [];

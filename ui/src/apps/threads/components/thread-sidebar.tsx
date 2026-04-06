@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { useUnread } from "@/lib/unread";
+import { useThreadUpdates } from "@/lib/use-thread-updates";
 
 interface ThreadSidebarProps {
   machineId: string;
@@ -52,24 +53,10 @@ export function ThreadSidebar({
     enabled: !!machineId,
   });
 
-  // SSE for real-time thread updates
-  useEffect(() => {
-    if (!machineId) return;
-
-    const evtSource = new EventSource(
-      `/api/machines/${machineId}/threads/stream`,
-    );
-
-    evtSource.addEventListener("thread:update", () => {
-      queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
-    });
-
-    evtSource.onerror = () => {
-      // SSE auto-reconnects
-    };
-
-    return () => evtSource.close();
-  }, [machineId, queryClient]);
+  // Shared SSE for real-time thread updates
+  useThreadUpdates(machineId, () => {
+    queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
+  });
 
   const handleCreated = (threadId: string) => {
     queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
