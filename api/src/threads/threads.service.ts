@@ -426,6 +426,55 @@ export class ThreadsService {
     return validIds.length;
   }
 
+  async fork(
+    id: string,
+    userId: string,
+    afterMessageId: string,
+  ): Promise<Thread> {
+    const thread = await this.findOne(id, userId);
+
+    // Fetch all messages in chronological order, then slice up to the cutoff
+    const allMessages = await this.messageRepository.find({
+      where: { thread_id: id },
+      order: { created_at: 'ASC', id: 'ASC' },
+    });
+
+    const cutoffIndex = allMessages.findIndex((m) => m.id === afterMessageId);
+    if (cutoffIndex === -1) throw new NotFoundException('Message not found');
+
+    const messages = allMessages.slice(0, cutoffIndex + 1);
+
+    // Create new thread with same machine + workspace
+    const title = thread.title ? `${thread.title} (fork)` : 'Forked thread';
+    const newThread = this.threadRepository.create({
+      machine_id: thread.machine_id,
+      workspace_id: thread.workspace_id,
+      title,
+    });
+    await this.threadRepository.save(newThread);
+
+    // Copy messages to the new thread
+    for (const msg of messages) {
+      const copy = this.messageRepository.create({
+        thread_id: newThread.id,
+        role: msg.role,
+        content: msg.content,
+        model: msg.model,
+        status:
+          msg.status === 'queued' || msg.status === 'running'
+            ? 'cancelled'
+            : msg.status,
+        metadata: msg.metadata,
+        started_at: msg.started_at,
+        completed_at: msg.completed_at,
+      });
+      await this.messageRepository.save(copy);
+    }
+
+    // Re-fetch with relations for the response
+    return this.findOne(newThread.id, userId);
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const thread = await this.findOne(id, userId);
     await this.messageRepository.delete({ thread_id: id });

@@ -5,6 +5,7 @@ import {
   CircleXIcon,
   ClipboardIcon,
   CodeIcon,
+  GitForkIcon,
   Loader2Icon,
   OctagonAlertIcon,
   RotateCwIcon,
@@ -42,6 +43,7 @@ interface MessageItemProps {
   overrideStatus?: string;
   onCancel?: () => void;
   onRetry?: () => void;
+  onFork?: () => void;
 }
 
 const markdownComponents: Components = {
@@ -451,6 +453,19 @@ function CopyMessageButton({ text }: { text: string }) {
   );
 }
 
+function ForkButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-muted-foreground hover:text-foreground shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100 max-sm:opacity-100"
+      title="Fork conversation from here"
+    >
+      <GitForkIcon className="size-3.5" />
+    </button>
+  );
+}
+
 function StatusIndicator({
   status,
   onCancel,
@@ -551,6 +566,7 @@ export function MessageItem({
   overrideStatus,
   onCancel,
   onRetry,
+  onFork,
 }: MessageItemProps) {
   const status = overrideStatus ?? message.status;
   const isUser = message.role === "user";
@@ -583,6 +599,7 @@ export function MessageItem({
               })}
             </span>
             <CopyMessageButton text={message.content} />
+            {onFork && <ForkButton onClick={onFork} />}
           </div>
           <p className="mt-1 text-sm leading-relaxed break-words whitespace-pre-wrap">
             {message.content}
@@ -613,6 +630,7 @@ export function MessageItem({
             })}
           </span>
           {status === "completed" && <CopyMessageButton text={copyableText} />}
+          {onFork && <ForkButton onClick={onFork} />}
         </div>
 
         <div className="mt-2">

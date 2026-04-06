@@ -529,6 +529,25 @@ export default function ThreadViewPage() {
     [threadId, queryClient],
   );
 
+  const handleFork = useCallback(
+    async (messageId: string) => {
+      if (!threadId) return;
+      try {
+        const forked = await api.threads.fork(threadId, messageId);
+        queryClient.invalidateQueries({
+          queryKey: ["threads"],
+        });
+        toast.success("Thread forked");
+        navigate(`/threads/${forked.id}`);
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : "Failed to fork thread";
+        toast.error(message);
+      }
+    },
+    [threadId, queryClient, navigate],
+  );
+
   const handleLoadOlder = useCallback(async () => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -1035,6 +1054,11 @@ export default function ThreadViewPage() {
                             (effectiveStatus === "error" ||
                               effectiveStatus === "timed_out")
                               ? () => handleRetry(msg.id)
+                              : undefined
+                          }
+                          onFork={
+                            !isSearchActive
+                              ? () => handleFork(msg.id)
                               : undefined
                           }
                         />

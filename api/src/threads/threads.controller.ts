@@ -53,6 +53,11 @@ class UpdateThreadDto {
   is_pinned?: boolean;
 }
 
+class ForkThreadDto {
+  @IsString()
+  after_message_id!: string;
+}
+
 class BulkThreadDto {
   @IsArray()
   @IsString({ each: true })
@@ -115,6 +120,27 @@ export class ThreadsController {
       id: t.id,
       machine_id: t.machine_id,
       workspace_id: t.workspace_id,
+      title: t.title,
+      status: t.status,
+      is_pinned: t.is_pinned,
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+    };
+  }
+
+  @Post('threads/:id/fork')
+  async fork(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: ForkThreadDto,
+  ) {
+    const t = await this.threadsService.fork(id, user.id, dto.after_message_id);
+    return {
+      id: t.id,
+      machine_id: t.machine_id,
+      workspace_id: t.workspace_id,
+      workspace_name: t.workspace?.name || null,
+      working_directory: t.workspace?.working_directory || null,
       title: t.title,
       status: t.status,
       is_pinned: t.is_pinned,

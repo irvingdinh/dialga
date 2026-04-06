@@ -492,6 +492,22 @@ export const api = {
         message_count: number;
         models: Record<string, number>;
       }>(`/api/threads/${threadId}/usage`),
+    fork: (threadId: string, afterMessageId: string) =>
+      request<{
+        id: string;
+        machine_id: string;
+        workspace_id: string | null;
+        workspace_name: string | null;
+        working_directory: string | null;
+        title: string | null;
+        status: string;
+        is_pinned: boolean;
+        created_at: string;
+        updated_at: string;
+      }>(`/api/threads/${threadId}/fork`, {
+        method: "POST",
+        body: JSON.stringify({ after_message_id: afterMessageId }),
+      }),
     exportMarkdown: async (threadId: string): Promise<void> => {
       const res = await fetch(`/api/threads/${threadId}/export.md`, {
         credentials: "include",
