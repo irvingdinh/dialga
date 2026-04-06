@@ -4,9 +4,11 @@ import {
   MessageSquareIcon,
   PinIcon,
   PlusIcon,
+  SearchIcon,
   SettingsIcon,
+  XIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { CreateThreadDialog } from "@/apps/threads/components/create-thread-dialog";
@@ -32,11 +34,21 @@ export function ThreadSidebar({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const { isUnread } = useUnread();
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const { data: threads, isLoading } = useQuery({
-    queryKey: ["threads", machineId, "active", "", "updated"],
-    queryFn: () => api.threads.list(machineId),
+    queryKey: ["threads", machineId, "active", searchQuery, "updated"],
+    queryFn: () =>
+      api.threads.list(machineId, searchQuery ? { q: searchQuery } : undefined),
     enabled: !!machineId,
   });
 
@@ -103,6 +115,39 @@ export function ThreadSidebar({
         </Button>
       </div>
 
+      {/* Search */}
+      <div className="border-b px-2 py-1.5">
+        <div className="relative">
+          <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2" />
+          <input
+            ref={searchRef}
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setSearchInput("");
+                searchRef.current?.blur();
+              }
+            }}
+            placeholder="Search threads..."
+            className="bg-muted/50 placeholder:text-muted-foreground/50 h-7 w-full rounded-md pr-7 pl-7 text-xs outline-none focus:ring-1 focus:ring-neutral-300 dark:focus:ring-neutral-600"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchInput("");
+                searchRef.current?.focus();
+              }}
+              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-1.5 -translate-y-1/2"
+            >
+              <XIcon className="size-3" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Thread list */}
       <div className="flex-1 overflow-y-auto">
         {isLoading && (
@@ -120,7 +165,15 @@ export function ThreadSidebar({
           <div className="flex flex-col gap-0.5 p-1">
             {threads.length === 0 && (
               <div className="text-muted-foreground px-3 py-8 text-center text-xs">
-                No threads yet
+                {searchQuery ? (
+                  <span>
+                    No threads match &ldquo;
+                    <span className="text-foreground/70">{searchQuery}</span>
+                    &rdquo;
+                  </span>
+                ) : (
+                  "No threads yet"
+                )}
               </div>
             )}
 
