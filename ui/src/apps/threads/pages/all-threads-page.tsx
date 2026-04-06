@@ -15,8 +15,8 @@ import { toast } from "sonner";
 import {
   FloatingActionBar,
   SelectAllBar,
-  ThreadListItem,
   ThreadListSkeleton,
+  ThreadListWithGroups,
 } from "@/apps/threads/components/thread-list-shared";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
@@ -376,7 +376,7 @@ export default function AllThreadsPage() {
 
       {/* Thread List */}
       {threads && (
-        <div className="mt-2 flex flex-col gap-2 pb-16">
+        <div className="mt-2 flex flex-col pb-16">
           {filteredThreads.length === 0 && (
             <div className="text-muted-foreground mt-2 flex flex-col items-center py-16 text-center text-sm">
               {searchQuery ? (
@@ -396,27 +396,22 @@ export default function AllThreadsPage() {
             </div>
           )}
 
-          {filteredThreads.map((thread) => (
-            <div key={thread.id} className="relative">
-              <ThreadListItem
-                thread={thread}
-                isUnread={isUnread(thread.id, thread.updated_at)}
-                isSelectMode={isSelectMode}
-                isSelected={selectedIds.has(thread.id)}
-                isDeleting={deletingThreadId === thread.id}
-                showMachine
-                onNavigate={() => navigate(`/threads/${thread.id}`)}
-                onToggleSelect={() => toggleSelect(thread.id)}
-                onTogglePin={() => handleTogglePin(thread.id, thread.is_pinned)}
-                onToggleArchive={() =>
-                  handleToggleArchive(thread.id, thread.status)
-                }
-                onStartDelete={() => setDeletingThreadId(thread.id)}
-                onCancelDelete={() => setDeletingThreadId(null)}
-                onConfirmDelete={() => handleDeleteThread(thread.id)}
-              />
-            </div>
-          ))}
+          <ThreadListWithGroups
+            threads={filteredThreads}
+            useGroups={sortBy === "updated" && !searchQuery}
+            isUnreadFn={isUnread}
+            isSelectMode={isSelectMode}
+            selectedIds={selectedIds}
+            deletingThreadId={deletingThreadId}
+            showMachine
+            onNavigate={(id) => navigate(`/threads/${id}`)}
+            onToggleSelect={toggleSelect}
+            onTogglePin={(id, pinned) => handleTogglePin(id, pinned)}
+            onToggleArchive={(id, status) => handleToggleArchive(id, status)}
+            onStartDelete={setDeletingThreadId}
+            onCancelDelete={() => setDeletingThreadId(null)}
+            onConfirmDelete={handleDeleteThread}
+          />
         </div>
       )}
 

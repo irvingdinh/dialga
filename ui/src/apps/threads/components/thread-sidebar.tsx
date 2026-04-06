@@ -8,11 +8,15 @@ import {
   SettingsIcon,
   XIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { CreateThreadDialog } from "@/apps/threads/components/create-thread-dialog";
-import { timeAgo } from "@/apps/threads/components/thread-list-shared";
+import {
+  DateGroupHeader,
+  groupThreadsByDate,
+  timeAgo,
+} from "@/apps/threads/components/thread-list-shared";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
@@ -164,81 +168,31 @@ export function ThreadSidebar({
               </div>
             )}
 
-            {threads.map((thread) => {
-              const isActive = thread.id === currentThreadId;
-              const unread =
-                !isActive && isUnread(thread.id, thread.updated_at);
-              return (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => {
-                    if (!isActive) navigate(`/threads/${thread.id}`);
-                  }}
-                  className={`group flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors ${
-                    isActive ? "bg-muted" : "hover:bg-muted/50"
-                  }`}
-                >
-                  <div className="flex w-full items-center gap-2">
-                    <span
-                      className={`flex min-w-0 flex-1 items-center gap-1 truncate text-[13px] ${
-                        isActive || unread ? "font-medium" : ""
-                      }`}
-                    >
-                      {unread && (
-                        <span className="size-1.5 shrink-0 rounded-full bg-blue-500" />
-                      )}
-                      {thread.is_pinned && (
-                        <PinIcon className="size-3 shrink-0 text-amber-500 dark:text-amber-400" />
-                      )}
-                      <span className="truncate">
-                        {thread.title ?? "New thread"}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground shrink-0 text-[10px]">
-                      {timeAgo(thread.updated_at, true)}
-                    </span>
-                  </div>
-                  <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[11px]">
-                    {thread.workspace_name ? (
-                      <span className="flex items-center gap-1 truncate">
-                        <FolderIcon className="size-2.5 shrink-0" />
-                        <span className="truncate">
-                          {thread.workspace_name}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="truncate opacity-50">No workspace</span>
-                    )}
-                    {thread.latest_message && (
-                      <>
-                        <span className="shrink-0 opacity-30">&middot;</span>
-                        <span className="truncate opacity-60">
-                          {thread.latest_message.status === "running"
-                            ? "Running..."
-                            : thread.latest_message.status === "queued"
-                              ? "Queued"
-                              : thread.latest_message.role === "user"
-                                ? `You: ${thread.latest_message.content.replace(/\n/g, " ").trim()}`
-                                : thread.latest_message.content
-                                    .replace(/\n/g, " ")
-                                    .trim() || "..."}
-                        </span>
-                      </>
-                    )}
-                    {thread.message_count > 0 && (
-                      <>
-                        <span className="shrink-0 opacity-30">&middot;</span>
-                        <span className="flex shrink-0 items-center gap-0.5">
-                          <MessageSquareIcon className="size-2.5" />
-                          {thread.message_count}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+            {threads.length > 0 &&
+              (searchQuery ? (
+                threads.map((thread) => (
+                  <SidebarThreadItem
+                    key={thread.id}
+                    thread={thread}
+                    isActive={thread.id === currentThreadId}
+                    isUnread={
+                      thread.id !== currentThreadId &&
+                      isUnread(thread.id, thread.updated_at)
+                    }
+                    onNavigate={() => {
+                      if (thread.id !== currentThreadId)
+                        navigate(`/threads/${thread.id}`);
+                    }}
+                  />
+                ))
+              ) : (
+                <SidebarGroupedList
+                  threads={threads}
+                  currentThreadId={currentThreadId}
+                  isUnreadFn={isUnread}
+                  onNavigate={(id) => navigate(`/threads/${id}`)}
+                />
+              ))}
           </div>
         )}
       </div>
@@ -250,5 +204,145 @@ export function ThreadSidebar({
         onCreated={handleCreated}
       />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar sub-components
+// ---------------------------------------------------------------------------
+
+function SidebarThreadItem({
+  thread,
+  isActive,
+  isUnread: unread,
+  onNavigate,
+}: {
+  thread: {
+    id: string;
+    title: string | null;
+    is_pinned: boolean;
+    updated_at: string;
+    workspace_name: string | null;
+    latest_message: {
+      role: string;
+      content: string;
+      status: string;
+    } | null;
+    message_count: number;
+  };
+  isActive: boolean;
+  isUnread: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onNavigate}
+      className={`group flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors ${
+        isActive ? "bg-muted" : "hover:bg-muted/50"
+      }`}
+    >
+      <div className="flex w-full items-center gap-2">
+        <span
+          className={`flex min-w-0 flex-1 items-center gap-1 truncate text-[13px] ${
+            isActive || unread ? "font-medium" : ""
+          }`}
+        >
+          {unread && (
+            <span className="size-1.5 shrink-0 rounded-full bg-blue-500" />
+          )}
+          {thread.is_pinned && (
+            <PinIcon className="size-3 shrink-0 text-amber-500 dark:text-amber-400" />
+          )}
+          <span className="truncate">{thread.title ?? "New thread"}</span>
+        </span>
+        <span className="text-muted-foreground shrink-0 text-[10px]">
+          {timeAgo(thread.updated_at, true)}
+        </span>
+      </div>
+      <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[11px]">
+        {thread.workspace_name ? (
+          <span className="flex items-center gap-1 truncate">
+            <FolderIcon className="size-2.5 shrink-0" />
+            <span className="truncate">{thread.workspace_name}</span>
+          </span>
+        ) : (
+          <span className="truncate opacity-50">No workspace</span>
+        )}
+        {thread.latest_message && (
+          <>
+            <span className="shrink-0 opacity-30">&middot;</span>
+            <span className="truncate opacity-60">
+              {thread.latest_message.status === "running"
+                ? "Running..."
+                : thread.latest_message.status === "queued"
+                  ? "Queued"
+                  : thread.latest_message.role === "user"
+                    ? `You: ${thread.latest_message.content.replace(/\n/g, " ").trim()}`
+                    : thread.latest_message.content
+                        .replace(/\n/g, " ")
+                        .trim() || "..."}
+            </span>
+          </>
+        )}
+        {thread.message_count > 0 && (
+          <>
+            <span className="shrink-0 opacity-30">&middot;</span>
+            <span className="flex shrink-0 items-center gap-0.5">
+              <MessageSquareIcon className="size-2.5" />
+              {thread.message_count}
+            </span>
+          </>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function SidebarGroupedList({
+  threads,
+  currentThreadId,
+  isUnreadFn,
+  onNavigate,
+}: {
+  threads: Array<{
+    id: string;
+    title: string | null;
+    is_pinned: boolean;
+    updated_at: string;
+    workspace_name: string | null;
+    latest_message: {
+      role: string;
+      content: string;
+      status: string;
+    } | null;
+    message_count: number;
+  }>;
+  currentThreadId: string;
+  isUnreadFn: (threadId: string, updatedAt: string) => boolean;
+  onNavigate: (threadId: string) => void;
+}) {
+  const groups = useMemo(() => groupThreadsByDate(threads as never), [threads]);
+
+  return (
+    <>
+      {groups.map((group) => (
+        <div key={group.label}>
+          <DateGroupHeader label={group.label} compact />
+          {group.threads.map((thread) => (
+            <SidebarThreadItem
+              key={thread.id}
+              thread={thread}
+              isActive={thread.id === currentThreadId}
+              isUnread={
+                thread.id !== currentThreadId &&
+                isUnreadFn(thread.id, thread.updated_at)
+              }
+              onNavigate={() => onNavigate(thread.id)}
+            />
+          ))}
+        </div>
+      ))}
+    </>
   );
 }

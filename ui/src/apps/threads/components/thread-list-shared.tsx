@@ -9,7 +9,7 @@ import {
   PinOffIcon,
   Trash2Icon,
 } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,86 @@ export function timeAgo(dateStr: string, compact = false): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return new Date(dateStr).toLocaleDateString();
+}
+
+// ---------------------------------------------------------------------------
+// Date grouping
+// ---------------------------------------------------------------------------
+
+export interface ThreadDateGroup {
+  label: string;
+  threads: ThreadListThread[];
+}
+
+export function groupThreadsByDate(
+  threads: ThreadListThread[],
+): ThreadDateGroup[] {
+  const now = new Date();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const yesterdayStart = todayStart - 86_400_000;
+  const sevenDaysAgo = todayStart - 7 * 86_400_000;
+  const thirtyDaysAgo = todayStart - 30 * 86_400_000;
+
+  const pinned: ThreadListThread[] = [];
+  const today: ThreadListThread[] = [];
+  const yesterday: ThreadListThread[] = [];
+  const prev7: ThreadListThread[] = [];
+  const prev30: ThreadListThread[] = [];
+  const older: ThreadListThread[] = [];
+
+  for (const t of threads) {
+    if (t.is_pinned) {
+      pinned.push(t);
+      continue;
+    }
+    const ts = new Date(t.updated_at).getTime();
+    if (ts >= todayStart) today.push(t);
+    else if (ts >= yesterdayStart) yesterday.push(t);
+    else if (ts >= sevenDaysAgo) prev7.push(t);
+    else if (ts >= thirtyDaysAgo) prev30.push(t);
+    else older.push(t);
+  }
+
+  const groups: ThreadDateGroup[] = [];
+  if (pinned.length) groups.push({ label: "Pinned", threads: pinned });
+  if (today.length) groups.push({ label: "Today", threads: today });
+  if (yesterday.length) groups.push({ label: "Yesterday", threads: yesterday });
+  if (prev7.length) groups.push({ label: "Previous 7 days", threads: prev7 });
+  if (prev30.length)
+    groups.push({ label: "Previous 30 days", threads: prev30 });
+  if (older.length) groups.push({ label: "Older", threads: older });
+
+  return groups;
+}
+
+// ---------------------------------------------------------------------------
+// DateGroupHeader
+// ---------------------------------------------------------------------------
+
+export function DateGroupHeader({
+  label,
+  compact = false,
+}: {
+  label: string;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <div className="text-muted-foreground/50 px-3 pt-3 pb-0.5 text-[10px] font-medium tracking-wider uppercase">
+        {label}
+      </div>
+    );
+  }
+  return (
+    <div className="text-muted-foreground/50 flex items-center gap-3 pt-4 pb-1 text-[11px] font-medium tracking-wider uppercase first:pt-0">
+      <span className="shrink-0">{label}</span>
+      <div className="bg-border h-px flex-1" />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -469,5 +549,83 @@ export function FloatingActionBar({
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ThreadListWithGroups — shared grouped/flat thread list renderer
+// ---------------------------------------------------------------------------
+
+interface ThreadListWithGroupsProps {
+  threads: ThreadListThread[];
+  useGroups: boolean;
+  isUnreadFn: (threadId: string, updatedAt: string) => boolean;
+  isSelectMode: boolean;
+  selectedIds: Set<string>;
+  deletingThreadId: string | null;
+  showMachine?: boolean;
+  onNavigate: (threadId: string) => void;
+  onToggleSelect: (threadId: string) => void;
+  onTogglePin: (threadId: string, isPinned: boolean) => void;
+  onToggleArchive: (threadId: string, status: string) => void;
+  onStartDelete: (threadId: string) => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: (threadId: string) => void;
+}
+
+export function ThreadListWithGroups({
+  threads,
+  useGroups,
+  isUnreadFn,
+  isSelectMode,
+  selectedIds,
+  deletingThreadId,
+  showMachine = false,
+  onNavigate,
+  onToggleSelect,
+  onTogglePin,
+  onToggleArchive,
+  onStartDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: ThreadListWithGroupsProps) {
+  const groups = useMemo(
+    () => (useGroups ? groupThreadsByDate(threads) : null),
+    [useGroups, threads],
+  );
+
+  const renderItem = (thread: ThreadListThread) => (
+    <div key={thread.id} className="relative">
+      <ThreadListItem
+        thread={thread}
+        isUnread={isUnreadFn(thread.id, thread.updated_at)}
+        isSelectMode={isSelectMode}
+        isSelected={selectedIds.has(thread.id)}
+        isDeleting={deletingThreadId === thread.id}
+        showMachine={showMachine}
+        onNavigate={() => onNavigate(thread.id)}
+        onToggleSelect={() => onToggleSelect(thread.id)}
+        onTogglePin={() => onTogglePin(thread.id, thread.is_pinned)}
+        onToggleArchive={() => onToggleArchive(thread.id, thread.status)}
+        onStartDelete={() => onStartDelete(thread.id)}
+        onCancelDelete={onCancelDelete}
+        onConfirmDelete={() => onConfirmDelete(thread.id)}
+      />
+    </div>
+  );
+
+  if (!groups) {
+    return <div className="flex flex-col gap-2">{threads.map(renderItem)}</div>;
+  }
+
+  return (
+    <>
+      {groups.map((group) => (
+        <div key={group.label} className="flex flex-col gap-2">
+          <DateGroupHeader label={group.label} />
+          {group.threads.map(renderItem)}
+        </div>
+      ))}
+    </>
   );
 }
