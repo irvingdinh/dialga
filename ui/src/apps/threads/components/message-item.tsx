@@ -7,6 +7,7 @@ import {
   EditButton,
   extractCopyableText,
   ForkButton,
+  StarButton,
 } from "@/apps/threads/components/message-actions";
 import {
   EventGroupRenderer,
@@ -36,6 +37,7 @@ interface MessageItemProps {
     content: string;
     model: string | null;
     status: string;
+    is_starred: boolean;
     metadata: Record<string, unknown> | null;
     created_at: string;
   };
@@ -45,6 +47,7 @@ interface MessageItemProps {
   onRetry?: () => void;
   onFork?: () => void;
   onEdit?: (content: string) => void;
+  onToggleStar?: () => void;
 }
 
 export function MessageItem({
@@ -55,6 +58,7 @@ export function MessageItem({
   onRetry,
   onFork,
   onEdit,
+  onToggleStar,
 }: MessageItemProps) {
   const status = overrideStatus ?? message.status;
   const isUser = message.role === "user";
@@ -121,6 +125,12 @@ export function MessageItem({
             {!isEditing && <CopyMessageButton text={message.content} />}
             {!isEditing && onFork && <ForkButton onClick={onFork} />}
             {!isEditing && onEdit && <EditButton onClick={startEditing} />}
+            {!isEditing && onToggleStar && (
+              <StarButton
+                isStarred={message.is_starred}
+                onClick={onToggleStar}
+              />
+            )}
           </div>
           {isEditing ? (
             <div className="mt-1">
@@ -181,6 +191,9 @@ export function MessageItem({
           </span>
           {status === "completed" && <CopyMessageButton text={copyableText} />}
           {onFork && <ForkButton onClick={onFork} />}
+          {onToggleStar && (
+            <StarButton isStarred={message.is_starred} onClick={onToggleStar} />
+          )}
         </div>
 
         <div className="mt-2">

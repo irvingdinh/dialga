@@ -5,6 +5,7 @@ import {
   LoaderIcon,
   MessageSquareIcon,
   SearchIcon,
+  StarIcon,
 } from "lucide-react";
 import type { RefObject } from "react";
 
@@ -20,6 +21,7 @@ interface Message {
   content: string;
   model: string | null;
   status: string;
+  is_starred: boolean;
   metadata: Record<string, unknown> | null;
   started_at: string | null;
   completed_at: string | null;
@@ -34,6 +36,7 @@ interface ThreadMessageListProps {
   isSearchActive: boolean;
   searchQuery: string;
   searchResultCount: number | undefined;
+  isStarredFilterActive: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadOlder: () => void;
@@ -43,6 +46,7 @@ interface ThreadMessageListProps {
   onRetryMessage: (messageId: string) => void;
   onFork: (messageId: string) => void;
   onEdit: (messageId: string, content: string) => void;
+  onToggleStar: (messageId: string) => void;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   bottomRef: RefObject<HTMLDivElement | null>;
   isNearBottom: boolean;
@@ -81,6 +85,7 @@ export function ThreadMessageList({
   isSearchActive,
   searchQuery,
   searchResultCount,
+  isStarredFilterActive,
   hasNextPage,
   isFetchingNextPage,
   onLoadOlder,
@@ -90,6 +95,7 @@ export function ThreadMessageList({
   onRetryMessage,
   onFork,
   onEdit,
+  onToggleStar,
   scrollContainerRef,
   bottomRef,
   isNearBottom,
@@ -127,6 +133,13 @@ export function ThreadMessageList({
                   No messages match &ldquo;{searchQuery}&rdquo;
                 </p>
               </>
+            ) : isStarredFilterActive ? (
+              <>
+                <StarIcon className="text-muted-foreground/40 mb-3 size-8" />
+                <p className="text-muted-foreground text-sm">
+                  No starred messages yet.
+                </p>
+              </>
             ) : (
               <>
                 <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
@@ -150,9 +163,18 @@ export function ThreadMessageList({
             </div>
           )}
 
+        {isStarredFilterActive && messages.length > 0 && (
+          <div className="px-4 pt-3 pb-0">
+            <p className="text-muted-foreground text-xs">
+              {messages.length} starred message
+              {messages.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        )}
+
         {messages.length > 0 && (
           <div className="flex flex-col gap-6 px-4 py-4">
-            {!isSearchActive && hasNextPage && (
+            {!isSearchActive && !isStarredFilterActive && hasNextPage && (
               <div className="flex justify-center">
                 <Button
                   variant="ghost"
@@ -172,21 +194,25 @@ export function ThreadMessageList({
             )}
 
             {messages.map((msg) => {
+              const isReadOnly = isSearchActive;
               const effectiveStatus = messageStatuses.get(msg.id) ?? msg.status;
               return (
                 <MessageItem
                   key={msg.id}
                   message={msg}
                   streamEvents={
-                    isSearchActive
+                    isReadOnly || isStarredFilterActive
                       ? undefined
                       : mergedStreamingEvents.get(msg.id)
                   }
                   overrideStatus={
-                    isSearchActive ? undefined : messageStatuses.get(msg.id)
+                    isReadOnly || isStarredFilterActive
+                      ? undefined
+                      : messageStatuses.get(msg.id)
                   }
                   onCancel={
-                    !isSearchActive &&
+                    !isReadOnly &&
+                    !isStarredFilterActive &&
                     msg.role === "assistant" &&
                     effectiveStatus !== "completed" &&
                     effectiveStatus !== "cancelled" &&
@@ -196,18 +222,26 @@ export function ThreadMessageList({
                       : undefined
                   }
                   onRetry={
-                    !isSearchActive &&
+                    !isReadOnly &&
+                    !isStarredFilterActive &&
                     msg.role === "assistant" &&
                     (effectiveStatus === "error" ||
                       effectiveStatus === "timed_out")
                       ? () => onRetryMessage(msg.id)
                       : undefined
                   }
-                  onFork={!isSearchActive ? () => onFork(msg.id) : undefined}
+                  onFork={
+                    !isReadOnly && !isStarredFilterActive
+                      ? () => onFork(msg.id)
+                      : undefined
+                  }
                   onEdit={
-                    !isSearchActive && msg.role === "user"
+                    !isReadOnly && !isStarredFilterActive && msg.role === "user"
                       ? (content: string) => onEdit(msg.id, content)
                       : undefined
+                  }
+                  onToggleStar={
+                    !isReadOnly ? () => onToggleStar(msg.id) : undefined
                   }
                 />
               );
@@ -217,7 +251,7 @@ export function ThreadMessageList({
         <div ref={bottomRef} />
       </div>
 
-      {!isNearBottom && !isSearchActive && (
+      {!isNearBottom && !isSearchActive && !isStarredFilterActive && (
         <div className="pointer-events-none sticky bottom-3 flex justify-center">
           <button
             type="button"

@@ -3,6 +3,7 @@ import {
   ClipboardIcon,
   GitForkIcon,
   PencilIcon,
+  StarIcon,
 } from "lucide-react";
 import { useCallback, useState } from "react";
 
@@ -79,6 +80,32 @@ export function EditButton({ onClick }: { onClick: () => void }) {
       title="Edit message"
     >
       <PencilIcon className="size-3.5" />
+    </button>
+  );
+}
+
+export function StarButton({
+  isStarred,
+  onClick,
+}: {
+  isStarred: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`shrink-0 rounded p-0.5 transition-opacity ${
+        isStarred
+          ? "text-amber-500 dark:text-amber-400"
+          : "text-muted-foreground hover:text-foreground opacity-0 group-hover/msg:opacity-100 max-sm:opacity-100"
+      }`}
+      title={isStarred ? "Unstar message" : "Star message"}
+    >
+      <StarIcon
+        className="size-3.5"
+        fill={isStarred ? "currentColor" : "none"}
+      />
     </button>
   );
 }

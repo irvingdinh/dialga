@@ -107,7 +107,12 @@ export class MessagesService {
   async list(
     threadId: string,
     userId: string,
-    options?: { limit?: number; before?: string; q?: string },
+    options?: {
+      limit?: number;
+      before?: string;
+      q?: string;
+      starred?: boolean;
+    },
   ): Promise<{ messages: Message[]; has_more: boolean }> {
     await this.verifyThreadOwnership(threadId, userId);
 
@@ -116,6 +121,16 @@ export class MessagesService {
     const qb = this.messageRepository
       .createQueryBuilder('msg')
       .where('msg.thread_id = :threadId', { threadId });
+
+    // Starred filter: return only starred messages, skip pagination
+    if (options?.starred) {
+      qb.andWhere('msg.is_starred = :starred', { starred: true });
+      const messages = await qb
+        .orderBy('msg.created_at', 'ASC')
+        .addOrderBy('msg.id', 'ASC')
+        .getMany();
+      return { messages, has_more: false };
+    }
 
     // Full-text search mode: skip cursor pagination, search content
     if (options?.q) {
@@ -217,6 +232,19 @@ export class MessagesService {
     );
 
     return { userMessage, assistantMessage };
+  }
+
+  async toggleStar(messageId: string, userId: string): Promise<Message> {
+    const message = await this.messageRepository.findOne({
+      where: { id: messageId },
+      relations: ['thread', 'thread.machine'],
+    });
+    if (!message) throw new NotFoundException('Message not found');
+    if (message.thread.machine.user_id !== userId)
+      throw new ForbiddenException();
+
+    message.is_starred = !message.is_starred;
+    return this.messageRepository.save(message);
   }
 
   async cancel(messageId: string, userId: string): Promise<Message> {

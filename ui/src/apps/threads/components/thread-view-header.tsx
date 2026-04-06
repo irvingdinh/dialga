@@ -13,6 +13,7 @@ import {
   PinIcon,
   PinOffIcon,
   SearchIcon,
+  StarIcon,
   Trash2Icon,
 } from "lucide-react";
 import type { RefObject } from "react";
@@ -48,9 +49,11 @@ interface ThreadViewHeaderProps {
   isGitPanelOpen: boolean;
   onToggleFileBrowser: () => void;
   onToggleGitPanel: () => void;
-  // Search, context & usage
+  // Search, starred filter, context & usage
   isSearchOpen: boolean;
   onToggleSearch: () => void;
+  isStarredFilterActive: boolean;
+  onToggleStarredFilter: () => void;
   isContextOpen: boolean;
   onToggleContext: () => void;
   isUsageOpen: boolean;
@@ -82,6 +85,8 @@ export function ThreadViewHeader({
   onToggleGitPanel,
   isSearchOpen,
   onToggleSearch,
+  isStarredFilterActive,
+  onToggleStarredFilter,
   isContextOpen,
   onToggleContext,
   isUsageOpen,
@@ -171,6 +176,22 @@ export function ThreadViewHeader({
               title="Search messages"
             >
               <SearchIcon className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onToggleStarredFilter}
+              className={`shrink-0 ${isStarredFilterActive ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground"}`}
+              title={
+                isStarredFilterActive
+                  ? "Show all messages"
+                  : "Show starred messages"
+              }
+            >
+              <StarIcon
+                className="size-4"
+                fill={isStarredFilterActive ? "currentColor" : "none"}
+              />
             </Button>
             <Button
               variant="ghost"

@@ -4,6 +4,7 @@ import {
   Get,
   Header,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -66,12 +67,14 @@ export class MessagesController {
     @Query('limit') limitStr?: string,
     @Query('before') before?: string,
     @Query('q') q?: string,
+    @Query('starred') starredStr?: string,
   ) {
     const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+    const starred = starredStr === 'true';
     const { messages, has_more } = await this.messagesService.list(
       threadId,
       user.id,
-      { limit, before, q },
+      { limit, before, q, starred },
     );
     return {
       messages: messages.map((m) => ({
@@ -81,6 +84,7 @@ export class MessagesController {
         content: m.content,
         model: m.model,
         status: m.status,
+        is_starred: m.is_starred,
         metadata: m.metadata ? JSON.parse(m.metadata) : null,
         started_at: m.started_at,
         completed_at: m.completed_at,
@@ -119,6 +123,15 @@ export class MessagesController {
         status: assistantMessage.status,
         created_at: assistantMessage.created_at,
       },
+    };
+  }
+
+  @Patch('messages/:id/star')
+  async toggleStar(@CurrentUser() user: User, @Param('id') id: string) {
+    const m = await this.messagesService.toggleStar(id, user.id);
+    return {
+      id: m.id,
+      is_starred: m.is_starred,
     };
   }
 

@@ -42,6 +42,9 @@ export class Message {
   @Column('longtext', { nullable: true })
   metadata: string | null;
 
+  @Column('boolean', { default: false })
+  is_starred: boolean = false;
+
   @Column('datetime', { nullable: true })
   started_at: Date | null;
 

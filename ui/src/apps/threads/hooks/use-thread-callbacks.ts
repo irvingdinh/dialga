@@ -55,6 +55,7 @@ export function useThreadCallbacks({
                   content,
                   model: null,
                   status: "completed",
+                  is_starred: false,
                   metadata: null,
                   started_at: null,
                   completed_at: null,
@@ -67,6 +68,7 @@ export function useThreadCallbacks({
                   content: "",
                   model: result.assistant_message.model,
                   status: result.assistant_message.status,
+                  is_starred: false,
                   metadata: null,
                   started_at: null,
                   completed_at: null,
@@ -127,6 +129,7 @@ export function useThreadCallbacks({
                   content: "",
                   model: result.assistant_message.model,
                   status: result.assistant_message.status,
+                  is_starred: false,
                   metadata: null,
                   started_at: null,
                   completed_at: null,
@@ -187,6 +190,7 @@ export function useThreadCallbacks({
               content: "",
               model: result.assistant_message.model,
               status: result.assistant_message.status,
+              is_starred: false,
               metadata: null,
               started_at: null,
               completed_at: null,
@@ -258,6 +262,40 @@ export function useThreadCallbacks({
     }
   }, [threadId, thread, queryClient]);
 
+  const handleToggleStar = useCallback(
+    async (messageId: string) => {
+      if (!threadId) return;
+      try {
+        const result = await api.messages.toggleStar(messageId);
+        queryClient.setQueryData(
+          ["messages", threadId],
+          (old: InfiniteData<MessagesPage> | undefined) => {
+            if (!old) return old;
+            return {
+              ...old,
+              pages: old.pages.map((page) => ({
+                ...page,
+                messages: page.messages.map((m) =>
+                  m.id === messageId
+                    ? { ...m, is_starred: result.is_starred }
+                    : m,
+                ),
+              })),
+            };
+          },
+        );
+        queryClient.invalidateQueries({
+          queryKey: ["messages-starred", threadId],
+        });
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : "Failed to star message";
+        toast.error(message);
+      }
+    },
+    [threadId, queryClient],
+  );
+
   const handleExport = useCallback(async () => {
     if (!threadId) return;
     try {
@@ -275,6 +313,7 @@ export function useThreadCallbacks({
     handleRetry,
     handleFork,
     handleEdit,
+    handleToggleStar,
     handleDelete,
     handleToggleArchive,
     handleTogglePin,

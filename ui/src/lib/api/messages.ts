@@ -3,12 +3,18 @@ import { request } from "./client";
 export const messagesApi = {
   list: (
     threadId: string,
-    params?: { limit?: number; before?: string; q?: string },
+    params?: {
+      limit?: number;
+      before?: string;
+      q?: string;
+      starred?: boolean;
+    },
   ) => {
     const sp = new URLSearchParams();
     if (params?.limit) sp.set("limit", String(params.limit));
     if (params?.before) sp.set("before", params.before);
     if (params?.q) sp.set("q", params.q);
+    if (params?.starred) sp.set("starred", "true");
     const query = sp.toString() ? `?${sp.toString()}` : "";
     return request<{
       messages: Array<{
@@ -18,6 +24,7 @@ export const messagesApi = {
         content: string;
         model: string | null;
         status: string;
+        is_starred: boolean;
         metadata: Record<string, unknown> | null;
         started_at: string | null;
         completed_at: string | null;
@@ -66,6 +73,11 @@ export const messagesApi = {
         created_at: string;
       };
     }>(`/api/messages/${messageId}/retry`, { method: "POST" }),
+  toggleStar: (messageId: string) =>
+    request<{ id: string; is_starred: boolean }>(
+      `/api/messages/${messageId}/star`,
+      { method: "PATCH" },
+    ),
   edit: (messageId: string, content: string) =>
     request<{
       user_message: {

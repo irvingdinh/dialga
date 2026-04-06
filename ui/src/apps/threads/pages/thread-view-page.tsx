@@ -63,6 +63,9 @@ export default function ThreadViewPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
+  // Starred filter state
+  const [isStarredFilterActive, setIsStarredFilterActive] = useState(false);
+
   const { markAsRead } = useUnread();
 
   // --- Queries ---
@@ -116,6 +119,12 @@ export default function ThreadViewPage() {
     enabled: !!threadId && !!searchQuery,
   });
 
+  const { data: starredData } = useQuery({
+    queryKey: ["messages-starred", threadId],
+    queryFn: () => api.messages.list(threadId!, { starred: true }),
+    enabled: !!threadId && isStarredFilterActive,
+  });
+
   const { data: usageData } = useQuery({
     queryKey: ["thread-usage", threadId],
     queryFn: () => api.threads.usage(threadId!),
@@ -166,7 +175,9 @@ export default function ThreadViewPage() {
   const isSearchActive = isSearchOpen && !!searchQuery;
   const displayMessages = isSearchActive
     ? (searchData?.messages ?? [])
-    : messages;
+    : isStarredFilterActive
+      ? (starredData?.messages ?? [])
+      : messages;
 
   // --- Scroll tracking ---
 
@@ -200,6 +211,7 @@ export default function ThreadViewPage() {
     handleRetry,
     handleFork,
     handleEdit,
+    handleToggleStar,
     handleDelete: deleteThread,
     handleToggleArchive,
     handleTogglePin,
@@ -259,6 +271,7 @@ export default function ThreadViewPage() {
   const toggleSearch = useCallback(() => {
     setIsSearchOpen((prev) => {
       if (!prev) {
+        setIsStarredFilterActive(false);
         setTimeout(() => searchInputRef.current?.focus(), 0);
       } else {
         setSearchInput("");
@@ -317,12 +330,29 @@ export default function ThreadViewPage() {
           },
         },
         {
+          key: "s",
+          handler: (e: KeyboardEvent) => {
+            e.preventDefault();
+            setIsStarredFilterActive((v) => {
+              if (!v) {
+                setIsSearchOpen(false);
+                setSearchInput("");
+                setSearchQuery("");
+              }
+              return !v;
+            });
+          },
+        },
+        {
           key: "Escape",
           allowInInput: true,
           handler: (e: KeyboardEvent) => {
             if (isSearchOpen) {
               e.preventDefault();
               toggleSearch();
+            } else if (isStarredFilterActive) {
+              e.preventDefault();
+              setIsStarredFilterActive(false);
             } else if (isFileBrowserOpen) {
               e.preventDefault();
               setIsFileBrowserOpen(false);
@@ -345,6 +375,7 @@ export default function ThreadViewPage() {
       [
         thread?.working_directory,
         isSearchOpen,
+        isStarredFilterActive,
         isFileBrowserOpen,
         isGitPanelOpen,
         isContextOpen,
@@ -407,6 +438,15 @@ export default function ThreadViewPage() {
           }}
           isSearchOpen={isSearchOpen}
           onToggleSearch={toggleSearch}
+          isStarredFilterActive={isStarredFilterActive}
+          onToggleStarredFilter={() => {
+            setIsStarredFilterActive((v) => !v);
+            if (!isStarredFilterActive) {
+              setIsSearchOpen(false);
+              setSearchInput("");
+              setSearchQuery("");
+            }
+          }}
           isContextOpen={isContextOpen}
           onToggleContext={() => setIsContextOpen((v) => !v)}
           isUsageOpen={isUsageOpen}
@@ -467,6 +507,7 @@ export default function ThreadViewPage() {
               isSearchActive={isSearchActive}
               searchQuery={searchQuery}
               searchResultCount={searchData?.messages.length}
+              isStarredFilterActive={isStarredFilterActive}
               hasNextPage={hasNextPage ?? false}
               isFetchingNextPage={isFetchingNextPage}
               onLoadOlder={handleLoadOlder}
@@ -476,6 +517,7 @@ export default function ThreadViewPage() {
               onRetryMessage={handleRetry}
               onFork={handleFork}
               onEdit={handleEdit}
+              onToggleStar={handleToggleStar}
               scrollContainerRef={scrollContainerRef}
               bottomRef={bottomRef}
               isNearBottom={isNearBottom}
