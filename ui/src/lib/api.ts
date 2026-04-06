@@ -299,6 +299,24 @@ export const api = {
       }>(`/api/messages/${messageId}/retry`, { method: "POST" }),
   },
 
+  tasks: {
+    active: () =>
+      request<{
+        tasks: Array<{
+          message_id: string;
+          thread_id: string;
+          thread_title: string | null;
+          machine_id: string;
+          machine_name: string;
+          workspace_name: string | null;
+          status: string;
+          model: string | null;
+          created_at: string;
+          started_at: string | null;
+        }>;
+      }>("/api/tasks/active"),
+  },
+
   threads: {
     list: (
       machineId: string,

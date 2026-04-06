@@ -33,6 +33,12 @@ class SendMessageDto {
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
+  @Get('tasks/active')
+  async listActive(@CurrentUser() user: User) {
+    const tasks = await this.messagesService.listActive(user.id);
+    return { tasks };
+  }
+
   @Get('threads/:threadId/messages')
   async list(
     @CurrentUser() user: User,
