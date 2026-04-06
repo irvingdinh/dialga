@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react";
 
 import { useAuth } from "@/apps/auth/auth-provider";
 import { api } from "@/lib/api";
+import { useNotificationEvent } from "@/lib/connection";
 import { useUnread } from "@/lib/unread";
 
 export function DocumentTitleUpdater() {
@@ -62,21 +63,11 @@ export function DocumentTitleUpdater() {
   }, [user]);
 
   // SSE: invalidate thread data when task notifications arrive
-  useEffect(() => {
-    if (!user) return;
-
-    const evtSource = new EventSource("/api/notifications/stream");
-
-    evtSource.addEventListener("task:notification", () => {
+  useNotificationEvent("task:notification", () => {
+    if (user) {
       queryClient.invalidateQueries({ queryKey: ["doc-title-threads"] });
-    });
-
-    evtSource.onerror = () => {
-      // EventSource auto-reconnects
-    };
-
-    return () => evtSource.close();
-  }, [user, queryClient]);
+    }
+  });
 
   return null;
 }

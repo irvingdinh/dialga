@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { useAuth } from "@/apps/auth/auth-provider";
+import { useNotificationEvent } from "@/lib/connection";
 
 const NOTIFICATIONS_PREF_KEY = "dialga-browser-notifications";
 
@@ -83,58 +84,47 @@ export function NotificationListener() {
     locationRef.current = location.pathname;
   }, [location.pathname]);
 
-  useEffect(() => {
+  useNotificationEvent("task:notification", (e: MessageEvent) => {
     if (!user) return;
+    try {
+      const data = JSON.parse(e.data) as TaskNotification;
 
-    const evtSource = new EventSource("/api/notifications/stream");
+      // Suppress notifications for the thread the user is currently viewing
+      const currentPath = locationRef.current;
+      if (currentPath === `/threads/${data.thread_id}`) return;
 
-    evtSource.addEventListener("task:notification", (e) => {
-      try {
-        const data = JSON.parse(e.data) as TaskNotification;
+      const title = data.thread_title || "Untitled thread";
+      const label = getNotificationLabel(data.type);
 
-        // Suppress notifications for the thread the user is currently viewing
-        const currentPath = locationRef.current;
-        if (currentPath === `/threads/${data.thread_id}`) return;
-
-        const title = data.thread_title || "Untitled thread";
-        const label = getNotificationLabel(data.type);
-
-        if (data.type === "task_error" || data.type === "task_timed_out") {
-          toast.error(`${label} — ${title}`, {
-            description: data.machine_name,
-            action: {
-              label: "View",
-              onClick: () => navigate(`/threads/${data.thread_id}`),
-            },
-            duration: 8000,
-          });
-        } else if (data.type === "task_completed") {
-          toast.success(`${label} — ${title}`, {
-            description: data.machine_name,
-            action: {
-              label: "View",
-              onClick: () => navigate(`/threads/${data.thread_id}`),
-            },
-            duration: 5000,
-          });
-        }
-        // Skip cancelled — user already knows
-
-        // Browser notification (when tab is hidden)
-        if (data.type !== "task_cancelled") {
-          sendBrowserNotification(data, `/threads/${data.thread_id}`);
-        }
-      } catch {
-        // Ignore parse errors
+      if (data.type === "task_error" || data.type === "task_timed_out") {
+        toast.error(`${label} — ${title}`, {
+          description: data.machine_name,
+          action: {
+            label: "View",
+            onClick: () => navigate(`/threads/${data.thread_id}`),
+          },
+          duration: 8000,
+        });
+      } else if (data.type === "task_completed") {
+        toast.success(`${label} — ${title}`, {
+          description: data.machine_name,
+          action: {
+            label: "View",
+            onClick: () => navigate(`/threads/${data.thread_id}`),
+          },
+          duration: 5000,
+        });
       }
-    });
+      // Skip cancelled — user already knows
 
-    evtSource.onerror = () => {
-      // EventSource auto-reconnects
-    };
-
-    return () => evtSource.close();
-  }, [user, navigate]);
+      // Browser notification (when tab is hidden)
+      if (data.type !== "task_cancelled") {
+        sendBrowserNotification(data, `/threads/${data.thread_id}`);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  });
 
   return null;
 }

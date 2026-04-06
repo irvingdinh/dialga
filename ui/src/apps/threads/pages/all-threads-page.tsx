@@ -20,6 +20,7 @@ import {
 } from "@/apps/threads/components/thread-list-shared";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
+import { useNotificationEvent } from "@/lib/connection";
 import { useUnread } from "@/lib/unread";
 import { usePageShortcuts } from "@/lib/use-page-shortcuts";
 
@@ -113,19 +114,9 @@ export default function AllThreadsPage() {
   });
 
   // SSE for real-time updates via notifications stream
-  useEffect(() => {
-    const evtSource = new EventSource("/api/notifications/stream");
-
-    evtSource.addEventListener("task:notification", () => {
-      queryClient.invalidateQueries({ queryKey: ["all-threads"] });
-    });
-
-    evtSource.onerror = () => {
-      // SSE will auto-reconnect
-    };
-
-    return () => evtSource.close();
-  }, [queryClient]);
+  useNotificationEvent("task:notification", () => {
+    queryClient.invalidateQueries({ queryKey: ["all-threads"] });
+  });
 
   const filteredThreads = useMemo(() => threads ?? [], [threads]);
 

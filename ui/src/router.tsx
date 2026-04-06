@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import { ProtectedRoute } from "@/apps/auth/protected-route";
 import { CommandPalette } from "@/components/command-palette";
+import { ConnectionBanner } from "@/components/connection-banner";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
 import { DocumentTitleUpdater } from "@/lib/document-title";
@@ -25,6 +26,7 @@ const SettingsPage = lazy(() => import("./apps/settings/pages/settings-page"));
 export const Router = () => {
   return (
     <BrowserRouter>
+      <ConnectionBanner />
       <NotificationListener />
       <DocumentTitleUpdater />
       <CommandPalette />

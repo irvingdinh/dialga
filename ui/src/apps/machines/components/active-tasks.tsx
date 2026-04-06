@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { useNotificationEvent } from "@/lib/connection";
 
 function elapsedTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -31,22 +32,12 @@ export function ActiveTasks({
   });
 
   // SSE: listen for task notifications to invalidate active tasks query
-  useEffect(() => {
-    const evtSource = new EventSource("/api/notifications/stream");
-
-    evtSource.addEventListener("task:notification", () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", "active"] });
-      queryClient.invalidateQueries({ queryKey: ["activity", "recent"] });
-      queryClient.invalidateQueries({ queryKey: ["threads-unread"] });
-      queryClient.invalidateQueries({ queryKey: ["usage", "summary"] });
-    });
-
-    evtSource.onerror = () => {
-      // SSE will auto-reconnect
-    };
-
-    return () => evtSource.close();
-  }, [queryClient]);
+  useNotificationEvent("task:notification", () => {
+    queryClient.invalidateQueries({ queryKey: ["tasks", "active"] });
+    queryClient.invalidateQueries({ queryKey: ["activity", "recent"] });
+    queryClient.invalidateQueries({ queryKey: ["threads-unread"] });
+    queryClient.invalidateQueries({ queryKey: ["usage", "summary"] });
+  });
 
   // Tick every second to update elapsed times
   useEffect(() => {
