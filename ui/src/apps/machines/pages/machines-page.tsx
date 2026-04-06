@@ -7,6 +7,7 @@ import {
   FolderIcon,
   LoaderIcon,
   MessageSquareIcon,
+  MessageSquarePlusIcon,
   MonitorIcon,
   PlusIcon,
   SettingsIcon,
@@ -19,6 +20,7 @@ import { useNavigate } from "react-router";
 
 import { useAuth } from "@/apps/auth/auth-provider";
 import { CreateMachineDialog } from "@/apps/machines/components/create-machine-dialog";
+import { QuickNewThreadDialog } from "@/components/quick-new-thread-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type HealthInfo } from "@/lib/api";
@@ -458,6 +460,7 @@ export default function MachinesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
+  const [newThreadOpen, setNewThreadOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -524,9 +527,17 @@ export default function MachinesPage() {
           <p className="text-muted-foreground text-xs">{user?.email}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setNewThreadOpen(true)}
+          >
+            <MessageSquarePlusIcon data-icon="inline-start" />
+            New Thread
+          </Button>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <PlusIcon data-icon="inline-start" />
-            New
+            Machine
           </Button>
           <Button
             variant="ghost"
@@ -598,6 +609,12 @@ export default function MachinesPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={() => refetch()}
+      />
+
+      <QuickNewThreadDialog
+        open={newThreadOpen}
+        onOpenChange={setNewThreadOpen}
+        onCreated={(threadId) => navigate(`/threads/${threadId}`)}
       />
     </div>
   );
