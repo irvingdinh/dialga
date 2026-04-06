@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
 import { useUnread } from "@/lib/unread";
+import { usePageShortcuts } from "@/lib/use-page-shortcuts";
 
 type DeleteState = "idle" | "confirming" | "deleting";
 
@@ -470,6 +471,71 @@ export default function ThreadViewPage() {
       toast.error(message);
     }
   }, [threadId]);
+
+  // --- Keyboard shortcuts ---
+
+  usePageShortcuts(
+    useMemo(
+      () => [
+        {
+          key: "/",
+          handler: (e: KeyboardEvent) => {
+            e.preventDefault();
+            toggleSearch();
+          },
+        },
+        {
+          key: "e",
+          handler: (e: KeyboardEvent) => {
+            if (!thread?.working_directory) return;
+            e.preventDefault();
+            setIsFileBrowserOpen((v) => !v);
+            setIsGitPanelOpen(false);
+          },
+        },
+        {
+          key: "g",
+          handler: (e: KeyboardEvent) => {
+            if (!thread?.working_directory) return;
+            e.preventDefault();
+            setIsGitPanelOpen((v) => !v);
+            setIsFileBrowserOpen(false);
+          },
+        },
+        {
+          key: "Escape",
+          allowInInput: true,
+          handler: (e: KeyboardEvent) => {
+            if (isSearchOpen) {
+              e.preventDefault();
+              toggleSearch();
+            } else if (isFileBrowserOpen) {
+              e.preventDefault();
+              setIsFileBrowserOpen(false);
+            } else if (isGitPanelOpen) {
+              e.preventDefault();
+              setIsGitPanelOpen(false);
+            } else if (isUsageOpen) {
+              e.preventDefault();
+              setIsUsageOpen(false);
+            } else if (deleteState === "confirming") {
+              e.preventDefault();
+              setDeleteState("idle");
+            }
+          },
+        },
+      ],
+      [
+        thread?.working_directory,
+        isSearchOpen,
+        isFileBrowserOpen,
+        isGitPanelOpen,
+        isUsageOpen,
+        deleteState,
+        toggleSearch,
+      ],
+    ),
+  );
 
   // --- Computed flags ---
 

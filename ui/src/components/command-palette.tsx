@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  KeyboardIcon,
   LogOutIcon,
   MessageSquareIcon,
   MonitorIcon,
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useAuth } from "@/apps/auth/auth-provider";
+import { OPEN_SHORTCUTS_EVENT } from "@/components/keyboard-shortcuts-dialog";
 import { QuickNewThreadDialog } from "@/components/quick-new-thread-dialog";
 import {
   Command,
@@ -215,6 +217,18 @@ export function CommandPalette() {
                 >
                   <SettingsIcon className="text-muted-foreground mr-2 h-4 w-4" />
                   <span className="flex-1">Settings</span>
+                </CommandItem>
+                <CommandItem
+                  value="keyboard-shortcuts-help"
+                  onSelect={() =>
+                    runAction(() => {
+                      window.dispatchEvent(new Event(OPEN_SHORTCUTS_EVENT));
+                    })
+                  }
+                >
+                  <KeyboardIcon className="text-muted-foreground mr-2 h-4 w-4" />
+                  <span className="flex-1">Keyboard shortcuts</span>
+                  <CommandShortcut>?</CommandShortcut>
                 </CommandItem>
                 <CommandItem
                   value="go-home-machines"

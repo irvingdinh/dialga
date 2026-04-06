@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
 import { useUnread } from "@/lib/unread";
+import { usePageShortcuts } from "@/lib/use-page-shortcuts";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -131,17 +132,43 @@ export default function ThreadsPage() {
     };
   }, [searchInput]);
 
-  // Escape key exits selection mode
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isSelectMode) {
-        setSelectedIds(new Set());
-        setConfirmBulkDelete(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSelectMode]);
+  // Page-level keyboard shortcuts
+  usePageShortcuts(
+    useMemo(
+      () => [
+        {
+          key: "/",
+          handler: (e: KeyboardEvent) => {
+            e.preventDefault();
+            searchInputRef.current?.focus();
+          },
+        },
+        {
+          key: "n",
+          handler: (e: KeyboardEvent) => {
+            e.preventDefault();
+            setCreateOpen(true);
+          },
+        },
+        {
+          key: "Escape",
+          allowInInput: true,
+          handler: (e: KeyboardEvent) => {
+            if (isSelectMode) {
+              e.preventDefault();
+              setSelectedIds(new Set());
+              setConfirmBulkDelete(false);
+            } else if (searchInput) {
+              e.preventDefault();
+              setSearchInput("");
+              searchInputRef.current?.blur();
+            }
+          },
+        },
+      ],
+      [isSelectMode, searchInput],
+    ),
+  );
 
   const { data: machine } = useQuery({
     queryKey: ["machine", machineId],
