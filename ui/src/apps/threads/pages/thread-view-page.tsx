@@ -34,6 +34,7 @@ import {
   MessageItem,
   type StreamEvent,
 } from "@/apps/threads/components/message-item";
+import { ThreadSidebar } from "@/apps/threads/components/thread-sidebar";
 import { WorkspaceSelector } from "@/apps/threads/components/workspace-selector";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -538,433 +539,449 @@ export default function ThreadViewPage() {
   const isPageError = threadError || messagesError;
 
   return (
-    <div className="flex h-dvh flex-col">
-      {/* Header */}
-      <div className="border-b px-4 py-3">
-        <div className="mx-auto flex max-w-lg items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => {
-              if (thread?.machine_id) {
-                navigate(`/machines/${thread.machine_id}/threads`);
-              } else {
-                navigate(-1);
-              }
-            }}
-          >
-            <ArrowLeftIcon className="size-4" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            {threadLoading ? (
-              <Skeleton className="h-4 w-32" />
-            ) : isEditingTitle ? (
-              <input
-                ref={titleInputRef}
-                type="text"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveTitle();
-                  if (e.key === "Escape") cancelEditingTitle();
-                }}
-                onBlur={saveTitle}
-                className="bg-muted w-full rounded-md border px-2 py-0.5 text-sm font-semibold tracking-tight outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-600"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={startEditingTitle}
-                className="group flex max-w-full items-center gap-1.5"
-              >
-                <h1 className="truncate text-sm font-semibold tracking-tight">
-                  {thread?.title ?? "New thread"}
-                </h1>
-                <PencilIcon className="text-muted-foreground size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-              </button>
-            )}
-            {!threadLoading && (
-              <button
-                type="button"
-                onClick={() => setIsWorkspaceSelectorOpen(true)}
-                className="text-muted-foreground group flex max-w-full items-center gap-1 truncate text-[11px] hover:underline"
-              >
-                <FolderIcon className="size-2.5 shrink-0" />
-                <span className="truncate">
-                  {thread?.workspace_name ?? "No workspace"}
-                </span>
-              </button>
-            )}
-          </div>
-          {!threadLoading && (
-            <div className="flex shrink-0 items-center gap-0.5">
-              {thread?.working_directory && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => {
-                      setIsFileBrowserOpen((v) => !v);
-                      setIsGitPanelOpen(false);
-                    }}
-                    className={`shrink-0 ${isFileBrowserOpen ? "text-foreground" : "text-muted-foreground"}`}
-                    title="Browse workspace files"
-                  >
-                    <FolderOpenIcon className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => {
-                      setIsGitPanelOpen((v) => !v);
-                      setIsFileBrowserOpen(false);
-                    }}
-                    className={`shrink-0 ${isGitPanelOpen ? "text-foreground" : "text-muted-foreground"}`}
-                    title="Git changes"
-                  >
-                    <GitBranchIcon className="size-4" />
-                  </Button>
-                </>
-              )}
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={toggleSearch}
-                className={`shrink-0 ${isSearchOpen ? "text-foreground" : "text-muted-foreground"}`}
-                title="Search messages"
-              >
-                <SearchIcon className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleExport}
-                className="text-muted-foreground shrink-0"
-                title="Export as Markdown"
-              >
-                <DownloadIcon className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleToggleArchive}
-                className="text-muted-foreground shrink-0"
-                title={
-                  thread?.status === "archived"
-                    ? "Unarchive thread"
-                    : "Archive thread"
-                }
-              >
-                {thread?.status === "archived" ? (
-                  <ArchiveRestoreIcon className="size-4" />
-                ) : (
-                  <ArchiveIcon className="size-4" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setDeleteState("confirming")}
-                className="text-muted-foreground hover:text-destructive shrink-0"
-              >
-                <Trash2Icon className="size-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="flex h-dvh">
+      {/* Desktop sidebar — thread list */}
+      {thread?.machine_id && (
+        <ThreadSidebar
+          machineId={thread.machine_id}
+          currentThreadId={threadId!}
+          machineName={machine?.name}
+          machineStatus={machineStatus ?? machine?.status}
+        />
+      )}
 
-      {/* Search Bar */}
-      {isSearchOpen && (
-        <div className="border-b px-4 py-2">
+      {/* Main content */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Header */}
+        <div className="border-b px-4 py-3">
           <div className="mx-auto flex max-w-lg items-center gap-2">
-            <SearchIcon className="text-muted-foreground size-4 shrink-0" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") toggleSearch();
-              }}
-              placeholder="Search messages..."
-              className="placeholder:text-muted-foreground flex-1 bg-transparent text-sm outline-none"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={clearSearch}
-                className="text-muted-foreground hover:text-foreground shrink-0"
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            )}
-            {searchLoading && searchQuery && (
-              <LoaderIcon className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Banner */}
-      {deleteState !== "idle" && (
-        <div className="border-b px-4 py-2">
-          <div className="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900/50 dark:bg-red-950/30">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              Delete this thread and all its messages?
-            </p>
-            <div className="flex shrink-0 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteState("idle")}
-                disabled={deleteState === "deleting"}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDelete}
-                disabled={deleteState === "deleting"}
-              >
-                {deleteState === "deleting" ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Archived Banner */}
-      {thread?.status === "archived" && (
-        <div className="border-b px-4 py-2">
-          <div className="text-muted-foreground mx-auto flex max-w-lg items-center justify-between rounded-xl border px-3 py-2 text-xs">
-            <span className="flex items-center gap-2">
-              <ArchiveIcon className="size-3.5 shrink-0" />
-              This thread is archived.
-            </span>
             <Button
               variant="ghost"
-              size="sm"
-              onClick={handleToggleArchive}
-              className="h-auto px-2 py-0.5 text-xs"
+              size="icon-sm"
+              onClick={() => {
+                if (thread?.machine_id) {
+                  navigate(`/machines/${thread.machine_id}/threads`);
+                } else {
+                  navigate(-1);
+                }
+              }}
             >
-              Unarchive
+              <ArrowLeftIcon className="size-4" />
             </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Offline Banner */}
-      {isOffline && (
-        <div className="border-b px-4 py-2">
-          <div className="mx-auto flex max-w-lg items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
-            <WifiOffIcon className="size-3.5 shrink-0" />
-            <span>
-              Machine is offline. Messages will be processed when it reconnects.
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Main content area — split-pane on desktop */}
-      <div className="flex min-h-0 flex-1">
-        {/* Messages column: hidden on mobile when panel open, always visible on desktop */}
-        <div
-          className={`flex min-w-0 flex-1 flex-col ${isPanelOpen ? "hidden lg:flex" : ""}`}
-        >
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-lg">
-              {/* Loading */}
-              {isPageLoading && <ThreadViewSkeleton />}
-
-              {/* Error */}
-              {isPageError && !isPageLoading && (
-                <div className="flex flex-col items-center px-4 py-16 text-center">
-                  <AlertCircleIcon className="text-muted-foreground/40 mb-3 size-8" />
-                  <p className="text-muted-foreground text-sm">
-                    Failed to load thread.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => refetchMessages()}
-                  >
-                    Retry
-                  </Button>
-                </div>
-              )}
-
-              {/* Empty state */}
-              {displayMessages.length === 0 &&
-                !isPageLoading &&
-                !isPageError && (
-                  <div className="flex flex-col items-center px-4 py-16 text-center">
-                    {isSearchActive ? (
-                      <>
-                        <SearchIcon className="text-muted-foreground/40 mb-3 size-8" />
-                        <p className="text-muted-foreground text-sm">
-                          No messages match &ldquo;{searchQuery}&rdquo;
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
-                        <p className="text-muted-foreground text-sm">
-                          No messages yet. Send one to get started.
-                        </p>
-                      </>
-                    )}
-                  </div>
-                )}
-
-              {/* Search result count */}
-              {isSearchActive &&
-                searchData &&
-                searchData.messages.length > 0 && (
-                  <div className="px-4 pt-3 pb-0">
-                    <p className="text-muted-foreground text-xs">
-                      {searchData.messages.length} result
-                      {searchData.messages.length !== 1 ? "s" : ""} for &ldquo;
-                      {searchQuery}&rdquo;
-                    </p>
-                  </div>
-                )}
-
-              {/* Message list */}
-              {displayMessages.length > 0 && (
-                <div className="flex flex-col gap-6 px-4 py-4">
-                  {/* Load older button — only in normal (non-search) mode */}
-                  {!isSearchActive && hasNextPage && (
-                    <div className="flex justify-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleLoadOlder}
-                        disabled={isFetchingNextPage}
-                        className="text-muted-foreground gap-1.5 text-xs"
-                      >
-                        {isFetchingNextPage ? (
-                          <LoaderIcon className="size-3.5 animate-spin" />
-                        ) : (
-                          <ChevronUpIcon className="size-3.5" />
-                        )}
-                        {isFetchingNextPage
-                          ? "Loading..."
-                          : "Load older messages"}
-                      </Button>
-                    </div>
-                  )}
-
-                  {displayMessages.map((msg) => {
-                    const effectiveStatus =
-                      messageStatuses.get(msg.id) ?? msg.status;
-                    return (
-                      <MessageItem
-                        key={msg.id}
-                        message={msg}
-                        streamEvents={
-                          isSearchActive
-                            ? undefined
-                            : streamingEvents.get(msg.id)
-                        }
-                        overrideStatus={
-                          isSearchActive
-                            ? undefined
-                            : messageStatuses.get(msg.id)
-                        }
-                        onCancel={
-                          !isSearchActive &&
-                          msg.role === "assistant" &&
-                          effectiveStatus !== "completed" &&
-                          effectiveStatus !== "cancelled" &&
-                          effectiveStatus !== "error" &&
-                          effectiveStatus !== "timed_out"
-                            ? () => handleCancel(msg.id)
-                            : undefined
-                        }
-                        onRetry={
-                          !isSearchActive &&
-                          msg.role === "assistant" &&
-                          (effectiveStatus === "error" ||
-                            effectiveStatus === "timed_out")
-                            ? () => handleRetry(msg.id)
-                            : undefined
-                        }
-                      />
-                    );
-                  })}
-                </div>
-              )}
-              <div ref={bottomRef} />
-            </div>
-
-            {/* Scroll-to-bottom floating button */}
-            {!isNearBottom && !isSearchActive && (
-              <div className="pointer-events-none sticky bottom-3 flex justify-center">
+            <div className="min-w-0 flex-1">
+              {threadLoading ? (
+                <Skeleton className="h-4 w-32" />
+              ) : isEditingTitle ? (
+                <input
+                  ref={titleInputRef}
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveTitle();
+                    if (e.key === "Escape") cancelEditingTitle();
+                  }}
+                  onBlur={saveTitle}
+                  className="bg-muted w-full rounded-md border px-2 py-0.5 text-sm font-semibold tracking-tight outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-600"
+                />
+              ) : (
                 <button
                   type="button"
-                  onClick={scrollToBottom}
-                  className="bg-background pointer-events-auto relative flex size-8 items-center justify-center rounded-full border shadow-md transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                  title="Scroll to bottom"
+                  onClick={startEditingTitle}
+                  className="group flex max-w-full items-center gap-1.5"
                 >
-                  <ArrowDownIcon className="text-muted-foreground size-4" />
-                  {hasNewMessages && (
-                    <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-blue-500" />
-                  )}
+                  <h1 className="truncate text-sm font-semibold tracking-tight">
+                    {thread?.title ?? "New thread"}
+                  </h1>
+                  <PencilIcon className="text-muted-foreground size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
                 </button>
+              )}
+              {!threadLoading && (
+                <button
+                  type="button"
+                  onClick={() => setIsWorkspaceSelectorOpen(true)}
+                  className="text-muted-foreground group flex max-w-full items-center gap-1 truncate text-[11px] hover:underline"
+                >
+                  <FolderIcon className="size-2.5 shrink-0" />
+                  <span className="truncate">
+                    {thread?.workspace_name ?? "No workspace"}
+                  </span>
+                </button>
+              )}
+            </div>
+            {!threadLoading && (
+              <div className="flex shrink-0 items-center gap-0.5">
+                {thread?.working_directory && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => {
+                        setIsFileBrowserOpen((v) => !v);
+                        setIsGitPanelOpen(false);
+                      }}
+                      className={`shrink-0 ${isFileBrowserOpen ? "text-foreground" : "text-muted-foreground"}`}
+                      title="Browse workspace files"
+                    >
+                      <FolderOpenIcon className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => {
+                        setIsGitPanelOpen((v) => !v);
+                        setIsFileBrowserOpen(false);
+                      }}
+                      className={`shrink-0 ${isGitPanelOpen ? "text-foreground" : "text-muted-foreground"}`}
+                      title="Git changes"
+                    >
+                      <GitBranchIcon className="size-4" />
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleSearch}
+                  className={`shrink-0 ${isSearchOpen ? "text-foreground" : "text-muted-foreground"}`}
+                  title="Search messages"
+                >
+                  <SearchIcon className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleExport}
+                  className="text-muted-foreground shrink-0"
+                  title="Export as Markdown"
+                >
+                  <DownloadIcon className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleToggleArchive}
+                  className="text-muted-foreground shrink-0"
+                  title={
+                    thread?.status === "archived"
+                      ? "Unarchive thread"
+                      : "Archive thread"
+                  }
+                >
+                  {thread?.status === "archived" ? (
+                    <ArchiveRestoreIcon className="size-4" />
+                  ) : (
+                    <ArchiveIcon className="size-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setDeleteState("confirming")}
+                  className="text-muted-foreground hover:text-destructive shrink-0"
+                >
+                  <Trash2Icon className="size-4" />
+                </Button>
               </div>
             )}
           </div>
-
-          {/* Input */}
-          <MessageInput onSend={handleSend} />
         </div>
 
-        {/* Side panel: file browser or git — on desktop appears beside messages, on mobile replaces them */}
-        {isPanelOpen && (
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:border-l">
-            {isFileBrowserOpen &&
-              thread?.machine_id &&
-              thread?.working_directory && (
-                <FileBrowser
-                  machineId={thread.machine_id}
-                  rootPath={thread.working_directory}
-                  onClose={() => setIsFileBrowserOpen(false)}
-                />
+        {/* Search Bar */}
+        {isSearchOpen && (
+          <div className="border-b px-4 py-2">
+            <div className="mx-auto flex max-w-lg items-center gap-2">
+              <SearchIcon className="text-muted-foreground size-4 shrink-0" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") toggleSearch();
+                }}
+                placeholder="Search messages..."
+                className="placeholder:text-muted-foreground flex-1 bg-transparent text-sm outline-none"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
               )}
-            {isGitPanelOpen &&
-              thread?.machine_id &&
-              thread?.working_directory && (
-                <GitPanel
-                  machineId={thread.machine_id}
-                  workingDirectory={thread.working_directory}
-                  onClose={() => setIsGitPanelOpen(false)}
-                />
+              {searchLoading && searchQuery && (
+                <LoaderIcon className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
               )}
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Workspace Selector Dialog */}
-      {thread && (
-        <WorkspaceSelector
-          machineId={thread.machine_id}
-          threadId={thread.id}
-          currentWorkspaceId={thread.workspace_id}
-          open={isWorkspaceSelectorOpen}
-          onOpenChange={setIsWorkspaceSelectorOpen}
-          onChanged={() => {
-            setIsFileBrowserOpen(false);
-            setIsGitPanelOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
-            queryClient.invalidateQueries({
-              queryKey: ["threads", thread.machine_id],
-            });
-          }}
-        />
-      )}
+        {/* Delete Confirmation Banner */}
+        {deleteState !== "idle" && (
+          <div className="border-b px-4 py-2">
+            <div className="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900/50 dark:bg-red-950/30">
+              <p className="text-sm text-red-800 dark:text-red-400">
+                Delete this thread and all its messages?
+              </p>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleteState("idle")}
+                  disabled={deleteState === "deleting"}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={deleteState === "deleting"}
+                >
+                  {deleteState === "deleting" ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Archived Banner */}
+        {thread?.status === "archived" && (
+          <div className="border-b px-4 py-2">
+            <div className="text-muted-foreground mx-auto flex max-w-lg items-center justify-between rounded-xl border px-3 py-2 text-xs">
+              <span className="flex items-center gap-2">
+                <ArchiveIcon className="size-3.5 shrink-0" />
+                This thread is archived.
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleToggleArchive}
+                className="h-auto px-2 py-0.5 text-xs"
+              >
+                Unarchive
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Offline Banner */}
+        {isOffline && (
+          <div className="border-b px-4 py-2">
+            <div className="mx-auto flex max-w-lg items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
+              <WifiOffIcon className="size-3.5 shrink-0" />
+              <span>
+                Machine is offline. Messages will be processed when it
+                reconnects.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Main content area — split-pane on desktop */}
+        <div className="flex min-h-0 flex-1">
+          {/* Messages column: hidden on mobile when panel open, always visible on desktop */}
+          <div
+            className={`flex min-w-0 flex-1 flex-col ${isPanelOpen ? "hidden lg:flex" : ""}`}
+          >
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+              <div className="mx-auto max-w-lg">
+                {/* Loading */}
+                {isPageLoading && <ThreadViewSkeleton />}
+
+                {/* Error */}
+                {isPageError && !isPageLoading && (
+                  <div className="flex flex-col items-center px-4 py-16 text-center">
+                    <AlertCircleIcon className="text-muted-foreground/40 mb-3 size-8" />
+                    <p className="text-muted-foreground text-sm">
+                      Failed to load thread.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => refetchMessages()}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {displayMessages.length === 0 &&
+                  !isPageLoading &&
+                  !isPageError && (
+                    <div className="flex flex-col items-center px-4 py-16 text-center">
+                      {isSearchActive ? (
+                        <>
+                          <SearchIcon className="text-muted-foreground/40 mb-3 size-8" />
+                          <p className="text-muted-foreground text-sm">
+                            No messages match &ldquo;{searchQuery}&rdquo;
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquareIcon className="text-muted-foreground/40 mb-3 size-8" />
+                          <p className="text-muted-foreground text-sm">
+                            No messages yet. Send one to get started.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                {/* Search result count */}
+                {isSearchActive &&
+                  searchData &&
+                  searchData.messages.length > 0 && (
+                    <div className="px-4 pt-3 pb-0">
+                      <p className="text-muted-foreground text-xs">
+                        {searchData.messages.length} result
+                        {searchData.messages.length !== 1 ? "s" : ""} for
+                        &ldquo;
+                        {searchQuery}&rdquo;
+                      </p>
+                    </div>
+                  )}
+
+                {/* Message list */}
+                {displayMessages.length > 0 && (
+                  <div className="flex flex-col gap-6 px-4 py-4">
+                    {/* Load older button — only in normal (non-search) mode */}
+                    {!isSearchActive && hasNextPage && (
+                      <div className="flex justify-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleLoadOlder}
+                          disabled={isFetchingNextPage}
+                          className="text-muted-foreground gap-1.5 text-xs"
+                        >
+                          {isFetchingNextPage ? (
+                            <LoaderIcon className="size-3.5 animate-spin" />
+                          ) : (
+                            <ChevronUpIcon className="size-3.5" />
+                          )}
+                          {isFetchingNextPage
+                            ? "Loading..."
+                            : "Load older messages"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {displayMessages.map((msg) => {
+                      const effectiveStatus =
+                        messageStatuses.get(msg.id) ?? msg.status;
+                      return (
+                        <MessageItem
+                          key={msg.id}
+                          message={msg}
+                          streamEvents={
+                            isSearchActive
+                              ? undefined
+                              : streamingEvents.get(msg.id)
+                          }
+                          overrideStatus={
+                            isSearchActive
+                              ? undefined
+                              : messageStatuses.get(msg.id)
+                          }
+                          onCancel={
+                            !isSearchActive &&
+                            msg.role === "assistant" &&
+                            effectiveStatus !== "completed" &&
+                            effectiveStatus !== "cancelled" &&
+                            effectiveStatus !== "error" &&
+                            effectiveStatus !== "timed_out"
+                              ? () => handleCancel(msg.id)
+                              : undefined
+                          }
+                          onRetry={
+                            !isSearchActive &&
+                            msg.role === "assistant" &&
+                            (effectiveStatus === "error" ||
+                              effectiveStatus === "timed_out")
+                              ? () => handleRetry(msg.id)
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
+
+              {/* Scroll-to-bottom floating button */}
+              {!isNearBottom && !isSearchActive && (
+                <div className="pointer-events-none sticky bottom-3 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={scrollToBottom}
+                    className="bg-background pointer-events-auto relative flex size-8 items-center justify-center rounded-full border shadow-md transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    title="Scroll to bottom"
+                  >
+                    <ArrowDownIcon className="text-muted-foreground size-4" />
+                    {hasNewMessages && (
+                      <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-blue-500" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <MessageInput onSend={handleSend} />
+          </div>
+
+          {/* Side panel: file browser or git — on desktop appears beside messages, on mobile replaces them */}
+          {isPanelOpen && (
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:border-l">
+              {isFileBrowserOpen &&
+                thread?.machine_id &&
+                thread?.working_directory && (
+                  <FileBrowser
+                    machineId={thread.machine_id}
+                    rootPath={thread.working_directory}
+                    onClose={() => setIsFileBrowserOpen(false)}
+                  />
+                )}
+              {isGitPanelOpen &&
+                thread?.machine_id &&
+                thread?.working_directory && (
+                  <GitPanel
+                    machineId={thread.machine_id}
+                    workingDirectory={thread.working_directory}
+                    onClose={() => setIsGitPanelOpen(false)}
+                  />
+                )}
+            </div>
+          )}
+        </div>
+
+        {/* Workspace Selector Dialog */}
+        {thread && (
+          <WorkspaceSelector
+            machineId={thread.machine_id}
+            threadId={thread.id}
+            currentWorkspaceId={thread.workspace_id}
+            open={isWorkspaceSelectorOpen}
+            onOpenChange={setIsWorkspaceSelectorOpen}
+            onChanged={() => {
+              setIsFileBrowserOpen(false);
+              setIsGitPanelOpen(false);
+              queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+              queryClient.invalidateQueries({
+                queryKey: ["threads", thread.machine_id],
+              });
+            }}
+          />
+        )}
+      </div>
+      {/* end main content */}
     </div>
   );
 }
