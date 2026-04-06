@@ -1,4 +1,4 @@
-import { SendIcon } from "lucide-react";
+import { SendIcon, SparklesIcon } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,14 @@ import { Button } from "@/components/ui/button";
 interface MessageInputProps {
   onSend: (content: string, model?: string) => void;
   disabled?: boolean;
+  resolvedModel?: string | null;
 }
 
-export function MessageInput({ onSend, disabled }: MessageInputProps) {
+export function MessageInput({
+  onSend,
+  disabled,
+  resolvedModel,
+}: MessageInputProps) {
   const [content, setContent] = useState("");
   const [model, setModel] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -94,6 +99,12 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
             )}
           </div>
         </div>
+        {model === "" && resolvedModel && (
+          <div className="text-muted-foreground mt-1 flex items-center gap-1 text-[10px] opacity-60">
+            <SparklesIcon className="size-2.5 shrink-0" />
+            <span>{resolvedModel}</span>
+          </div>
+        )}
       </div>
     </div>
   );

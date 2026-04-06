@@ -84,6 +84,9 @@ export const threadsApi = {
       workspace_id: string | null;
       workspace_name: string | null;
       working_directory: string | null;
+      workspace_agent: string | null;
+      workspace_model: string | null;
+      workspace_custom_instruction: string | null;
       title: string | null;
       status: string;
       is_pinned: boolean;
@@ -105,6 +108,9 @@ export const threadsApi = {
       workspace_id: string | null;
       workspace_name: string | null;
       working_directory: string | null;
+      workspace_agent: string | null;
+      workspace_model: string | null;
+      workspace_custom_instruction: string | null;
       title: string | null;
       status: string;
       is_pinned: boolean;
@@ -151,6 +157,9 @@ export const threadsApi = {
       workspace_id: string | null;
       workspace_name: string | null;
       working_directory: string | null;
+      workspace_agent: string | null;
+      workspace_model: string | null;
+      workspace_custom_instruction: string | null;
       title: string | null;
       status: string;
       is_pinned: boolean;

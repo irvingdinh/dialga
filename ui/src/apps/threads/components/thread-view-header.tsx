@@ -7,6 +7,7 @@ import {
   FolderIcon,
   FolderOpenIcon,
   GitBranchIcon,
+  InfoIcon,
   PencilIcon,
   PinIcon,
   PinOffIcon,
@@ -45,9 +46,11 @@ interface ThreadViewHeaderProps {
   isGitPanelOpen: boolean;
   onToggleFileBrowser: () => void;
   onToggleGitPanel: () => void;
-  // Search & usage
+  // Search, context & usage
   isSearchOpen: boolean;
   onToggleSearch: () => void;
+  isContextOpen: boolean;
+  onToggleContext: () => void;
   isUsageOpen: boolean;
   onToggleUsage: () => void;
   // Actions
@@ -75,6 +78,8 @@ export function ThreadViewHeader({
   onToggleGitPanel,
   isSearchOpen,
   onToggleSearch,
+  isContextOpen,
+  onToggleContext,
   isUsageOpen,
   onToggleUsage,
   onExport,
@@ -161,6 +166,15 @@ export function ThreadViewHeader({
               title="Search messages"
             >
               <SearchIcon className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onToggleContext}
+              className={`shrink-0 ${isContextOpen ? "text-foreground" : "text-muted-foreground"}`}
+              title="Workspace context"
+            >
+              <InfoIcon className="size-4" />
             </Button>
             <Button
               variant="ghost"

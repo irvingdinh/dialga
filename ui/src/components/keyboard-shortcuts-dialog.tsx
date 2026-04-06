@@ -39,6 +39,7 @@ const groups: ShortcutGroup[] = [
       { keys: ["Esc"], description: "Close panel / search / cancel" },
       { keys: ["E"], description: "Toggle file browser" },
       { keys: ["G"], description: "Toggle git panel" },
+      { keys: ["I"], description: "Toggle workspace context" },
     ],
   },
   {

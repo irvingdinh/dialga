@@ -10,6 +10,10 @@ import { FileBrowser } from "@/apps/threads/components/file-browser";
 import { GitPanel } from "@/apps/threads/components/git-panel";
 import { MessageInput } from "@/apps/threads/components/message-input";
 import { ThreadBanners } from "@/apps/threads/components/thread-banners";
+import {
+  resolveModel,
+  ThreadContextBar,
+} from "@/apps/threads/components/thread-context-bar";
 import { ThreadMessageList } from "@/apps/threads/components/thread-message-list";
 import { ThreadSearchBar } from "@/apps/threads/components/thread-search-bar";
 import { ThreadSidebar } from "@/apps/threads/components/thread-sidebar";
@@ -43,6 +47,7 @@ export default function ThreadViewPage() {
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
   const [isGitPanelOpen, setIsGitPanelOpen] = useState(false);
   const [isWorkspaceSelectorOpen, setIsWorkspaceSelectorOpen] = useState(false);
+  const [isContextOpen, setIsContextOpen] = useState(false);
   const [isUsageOpen, setIsUsageOpen] = useState(false);
 
   // Scroll-to-bottom state
@@ -303,6 +308,13 @@ export default function ThreadViewPage() {
           },
         },
         {
+          key: "i",
+          handler: (e: KeyboardEvent) => {
+            e.preventDefault();
+            setIsContextOpen((v) => !v);
+          },
+        },
+        {
           key: "Escape",
           allowInInput: true,
           handler: (e: KeyboardEvent) => {
@@ -315,6 +327,9 @@ export default function ThreadViewPage() {
             } else if (isGitPanelOpen) {
               e.preventDefault();
               setIsGitPanelOpen(false);
+            } else if (isContextOpen) {
+              e.preventDefault();
+              setIsContextOpen(false);
             } else if (isUsageOpen) {
               e.preventDefault();
               setIsUsageOpen(false);
@@ -330,6 +345,7 @@ export default function ThreadViewPage() {
         isSearchOpen,
         isFileBrowserOpen,
         isGitPanelOpen,
+        isContextOpen,
         isUsageOpen,
         deleteState,
         toggleSearch,
@@ -389,6 +405,8 @@ export default function ThreadViewPage() {
           }}
           isSearchOpen={isSearchOpen}
           onToggleSearch={toggleSearch}
+          isContextOpen={isContextOpen}
+          onToggleContext={() => setIsContextOpen((v) => !v)}
           isUsageOpen={isUsageOpen}
           onToggleUsage={() => setIsUsageOpen((v) => !v)}
           onExport={handleExport}
@@ -408,6 +426,18 @@ export default function ThreadViewPage() {
             hasSearchQuery={!!searchQuery}
           />
         )}
+
+        <ThreadContextBar
+          isOpen={isContextOpen}
+          workspaceAgent={thread?.workspace_agent ?? null}
+          workspaceModel={thread?.workspace_model ?? null}
+          workspaceCustomInstruction={
+            thread?.workspace_custom_instruction ?? null
+          }
+          workingDirectory={thread?.working_directory ?? null}
+          machineDefaultAgent={machine?.default_agent}
+          machineDefaultModel={machine?.default_model}
+        />
 
         <ThreadUsageBar isOpen={isUsageOpen} usageData={usageData} />
 
@@ -450,7 +480,13 @@ export default function ThreadViewPage() {
               onScrollToBottom={scrollToBottom}
             />
 
-            <MessageInput onSend={handleSend} />
+            <MessageInput
+              onSend={handleSend}
+              resolvedModel={resolveModel(
+                thread?.workspace_model,
+                machine?.default_model,
+              )}
+            />
           </div>
 
           {/* Side panel: file browser or git */}
