@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
+import { useUnread } from "@/lib/unread";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -110,6 +111,7 @@ export default function ThreadsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { isUnread } = useUnread();
 
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -422,135 +424,143 @@ export default function ThreadsPage() {
             </div>
           )}
 
-          {filteredThreads.map((thread) => (
-            <div key={thread.id} className="relative">
-              {deletingThreadId === thread.id ? (
-                <div className="flex flex-col gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/30">
-                  <p className="text-sm text-red-800 dark:text-red-400">
-                    Delete this thread and all its messages?
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDeletingThreadId(null)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteThread(thread.id)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={`group hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${thread.status === "archived" ? "opacity-60" : ""}`}
-                >
-                  <button
-                    onClick={() => navigate(`/threads/${thread.id}`)}
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                  >
-                    {thread.is_pinned ? (
-                      <PinIcon className="mt-0.5 size-4 shrink-0 text-amber-500 dark:text-amber-400" />
-                    ) : (
-                      <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">
-                        {thread.title ?? "New thread"}
-                      </div>
-                      {thread.latest_message && (
-                        <div className="text-muted-foreground mt-0.5 truncate text-xs">
-                          <LatestMessagePreview
-                            message={thread.latest_message}
-                          />
-                        </div>
-                      )}
-                      <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
-                        {thread.status === "archived" && (
-                          <>
-                            <Badge
-                              variant="outline"
-                              className="px-1.5 py-0 text-[10px]"
-                            >
-                              archived
-                            </Badge>
-                            <span>·</span>
-                          </>
-                        )}
-                        {thread.workspace_name && (
-                          <>
-                            <span className="flex items-center gap-1">
-                              <FolderIcon className="size-3" />
-                              {thread.workspace_name}
-                            </span>
-                            <span>·</span>
-                          </>
-                        )}
-                        {thread.message_count > 0 && (
-                          <>
-                            <span>
-                              {thread.message_count}{" "}
-                              {thread.message_count === 1 ? "msg" : "msgs"}
-                            </span>
-                            <span>·</span>
-                          </>
-                        )}
-                        <span>{timeAgo(thread.updated_at)}</span>
-                      </div>
+          {filteredThreads.map((thread) => {
+            const unread = isUnread(thread.id, thread.updated_at);
+            return (
+              <div key={thread.id} className="relative">
+                {deletingThreadId === thread.id ? (
+                  <div className="flex flex-col gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/30">
+                    <p className="text-sm text-red-800 dark:text-red-400">
+                      Delete this thread and all its messages?
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeletingThreadId(null)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteThread(thread.id)}
+                      >
+                        Delete
+                      </Button>
                     </div>
-                  </button>
-                  <div className="mt-0.5 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100">
+                  </div>
+                ) : (
+                  <div
+                    className={`group hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${thread.status === "archived" ? "opacity-60" : ""}`}
+                  >
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTogglePin(thread.id, thread.is_pinned);
-                      }}
-                      className={`hover:text-foreground ${thread.is_pinned ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/40"}`}
-                      title={thread.is_pinned ? "Unpin thread" : "Pin thread"}
+                      onClick={() => navigate(`/threads/${thread.id}`)}
+                      className="flex min-w-0 flex-1 items-start gap-3 text-left"
                     >
                       {thread.is_pinned ? (
-                        <PinOffIcon className="size-4" />
+                        <PinIcon className="mt-0.5 size-4 shrink-0 text-amber-500 dark:text-amber-400" />
                       ) : (
-                        <PinIcon className="size-4" />
+                        <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
                       )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 truncate text-sm font-medium">
+                          {unread && (
+                            <span className="size-1.5 shrink-0 rounded-full bg-blue-500" />
+                          )}
+                          <span className="truncate">
+                            {thread.title ?? "New thread"}
+                          </span>
+                        </div>
+                        {thread.latest_message && (
+                          <div className="text-muted-foreground mt-0.5 truncate text-xs">
+                            <LatestMessagePreview
+                              message={thread.latest_message}
+                            />
+                          </div>
+                        )}
+                        <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                          {thread.status === "archived" && (
+                            <>
+                              <Badge
+                                variant="outline"
+                                className="px-1.5 py-0 text-[10px]"
+                              >
+                                archived
+                              </Badge>
+                              <span>·</span>
+                            </>
+                          )}
+                          {thread.workspace_name && (
+                            <>
+                              <span className="flex items-center gap-1">
+                                <FolderIcon className="size-3" />
+                                {thread.workspace_name}
+                              </span>
+                              <span>·</span>
+                            </>
+                          )}
+                          {thread.message_count > 0 && (
+                            <>
+                              <span>
+                                {thread.message_count}{" "}
+                                {thread.message_count === 1 ? "msg" : "msgs"}
+                              </span>
+                              <span>·</span>
+                            </>
+                          )}
+                          <span>{timeAgo(thread.updated_at)}</span>
+                        </div>
+                      </div>
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleArchive(thread.id, thread.status);
-                      }}
-                      className="text-muted-foreground/40 hover:text-foreground"
-                      title={
-                        thread.status === "archived"
-                          ? "Unarchive thread"
-                          : "Archive thread"
-                      }
-                    >
-                      {thread.status === "archived" ? (
-                        <ArchiveRestoreIcon className="size-4" />
-                      ) : (
-                        <ArchiveIcon className="size-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingThreadId(thread.id);
-                      }}
-                      className="text-muted-foreground/40 hover:text-destructive"
-                    >
-                      <Trash2Icon className="size-4" />
-                    </button>
+                    <div className="mt-0.5 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTogglePin(thread.id, thread.is_pinned);
+                        }}
+                        className={`hover:text-foreground ${thread.is_pinned ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/40"}`}
+                        title={thread.is_pinned ? "Unpin thread" : "Pin thread"}
+                      >
+                        {thread.is_pinned ? (
+                          <PinOffIcon className="size-4" />
+                        ) : (
+                          <PinIcon className="size-4" />
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleArchive(thread.id, thread.status);
+                        }}
+                        className="text-muted-foreground/40 hover:text-foreground"
+                        title={
+                          thread.status === "archived"
+                            ? "Unarchive thread"
+                            : "Archive thread"
+                        }
+                      >
+                        {thread.status === "archived" ? (
+                          <ArchiveRestoreIcon className="size-4" />
+                        ) : (
+                          <ArchiveIcon className="size-4" />
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingThreadId(thread.id);
+                        }}
+                        className="text-muted-foreground/40 hover:text-destructive"
+                      >
+                        <Trash2Icon className="size-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

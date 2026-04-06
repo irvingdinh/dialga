@@ -8,6 +8,7 @@ import { AuthProvider } from "@/apps/auth/auth-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/lib/theme";
+import { UnreadProvider } from "@/lib/unread";
 
 import { Router } from "./router";
 
@@ -19,8 +20,10 @@ createRoot(document.getElementById("root")!).render(
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <Router />
-            <Toaster position="top-center" />
+            <UnreadProvider>
+              <Router />
+              <Toaster position="top-center" />
+            </UnreadProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>

@@ -10,7 +10,7 @@ import {
   SunIcon,
   XIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useAuth } from "@/apps/auth/auth-provider";
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type HealthInfo } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
+import { useUnread } from "@/lib/unread";
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return "Never";
@@ -64,6 +65,7 @@ function ActiveTasks({
 
     evtSource.addEventListener("task:notification", () => {
       queryClient.invalidateQueries({ queryKey: ["tasks", "active"] });
+      queryClient.invalidateQueries({ queryKey: ["threads-unread"] });
     });
 
     evtSource.onerror = () => {
@@ -193,6 +195,7 @@ function AgentIndicator({
 
 function MachineCard({
   machine,
+  unreadCount,
   onClick,
 }: {
   machine: {
@@ -206,6 +209,7 @@ function MachineCard({
     thread_count: number;
     workspace_count: number;
   };
+  unreadCount: number;
   onClick: () => void;
 }) {
   const isOnline = machine.status === "online";
@@ -223,7 +227,14 @@ function MachineCard({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{machine.name}</div>
+          <div className="flex items-center gap-2 truncate text-sm font-medium">
+            <span className="truncate">{machine.name}</span>
+            {unreadCount > 0 && (
+              <span className="inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-500 text-[10px] font-semibold text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </div>
           <div className="text-muted-foreground mt-0.5 text-xs">
             {machine.default_agent === "claude" ? "Claude Code" : "Codex CLI"}
             {machine.default_model ? ` · ${machine.default_model}` : ""}
@@ -291,6 +302,43 @@ function MachineListSkeleton() {
   );
 }
 
+function useUnreadCounts(machines: Array<{ id: string }> | undefined) {
+  const { getUnreadCount } = useUnread();
+
+  const machineIds = useMemo(
+    () => (machines ?? []).map((m) => m.id),
+    [machines],
+  );
+
+  const { data: threadsByMachine } = useQuery({
+    queryKey: ["threads-unread", machineIds],
+    queryFn: async () => {
+      const result: Record<
+        string,
+        Array<{ id: string; updated_at: string }>
+      > = {};
+      await Promise.all(
+        machineIds.map(async (id) => {
+          result[id] = await api.threads.list(id);
+        }),
+      );
+      return result;
+    },
+    enabled: machineIds.length > 0,
+    staleTime: 30_000,
+  });
+
+  return useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (threadsByMachine) {
+      for (const [machineId, threads] of Object.entries(threadsByMachine)) {
+        counts[machineId] = getUnreadCount(threads);
+      }
+    }
+    return counts;
+  }, [threadsByMachine, getUnreadCount]);
+}
+
 export default function MachinesPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -308,6 +356,8 @@ export default function MachinesPage() {
     queryKey: ["machines"],
     queryFn: api.machines.list,
   });
+
+  const unreadCounts = useUnreadCounts(machines);
 
   // SSE for real-time machine status updates
   useEffect(() => {
@@ -420,6 +470,7 @@ export default function MachinesPage() {
             <MachineCard
               key={machine.id}
               machine={machine}
+              unreadCount={unreadCounts[machine.id] ?? 0}
               onClick={() => navigate(`/machines/${machine.id}/threads`)}
             />
           ))}

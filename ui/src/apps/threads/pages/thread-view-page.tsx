@@ -41,6 +41,7 @@ import { WorkspaceSelector } from "@/apps/threads/components/workspace-selector"
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
+import { useUnread } from "@/lib/unread";
 
 type DeleteState = "idle" | "confirming" | "deleting";
 
@@ -114,6 +115,8 @@ export default function ThreadViewPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
+  const { markAsRead } = useUnread();
+
   const {
     data: thread,
     isLoading: threadLoading,
@@ -123,6 +126,11 @@ export default function ThreadViewPage() {
     queryFn: () => api.threads.get(threadId!),
     enabled: !!threadId,
   });
+
+  // Mark thread as read on mount and when threadId changes
+  useEffect(() => {
+    if (threadId) markAsRead(threadId);
+  }, [threadId, markAsRead]);
 
   const { data: machine } = useQuery({
     queryKey: ["machine", thread?.machine_id],
@@ -245,6 +253,8 @@ export default function ThreadViewPage() {
         // Refetch messages to get final state
         queryClient.invalidateQueries({ queryKey: ["messages", threadId] });
         queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+        // Keep thread marked as read while viewing
+        if (threadId) markAsRead(threadId);
       } catch {
         // ignore
       }
@@ -255,7 +265,7 @@ export default function ThreadViewPage() {
     };
 
     return () => evtSource.close();
-  }, [threadId, queryClient]);
+  }, [threadId, queryClient, markAsRead]);
 
   // SSE for machine status
   useEffect(() => {

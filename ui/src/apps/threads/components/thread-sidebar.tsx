@@ -13,6 +13,7 @@ import { CreateThreadDialog } from "@/apps/threads/components/create-thread-dial
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { useUnread } from "@/lib/unread";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -45,6 +46,7 @@ export function ThreadSidebar({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const { isUnread } = useUnread();
 
   const { data: threads, isLoading } = useQuery({
     queryKey: ["threads", machineId, "active", "", "updated"],
@@ -138,6 +140,8 @@ export function ThreadSidebar({
 
             {threads.map((thread) => {
               const isActive = thread.id === currentThreadId;
+              const unread =
+                !isActive && isUnread(thread.id, thread.updated_at);
               return (
                 <button
                   key={thread.id}
@@ -152,9 +156,12 @@ export function ThreadSidebar({
                   <div className="flex w-full items-center gap-2">
                     <span
                       className={`flex min-w-0 flex-1 items-center gap-1 truncate text-[13px] ${
-                        isActive ? "font-medium" : ""
+                        isActive || unread ? "font-medium" : ""
                       }`}
                     >
+                      {unread && (
+                        <span className="size-1.5 shrink-0 rounded-full bg-blue-500" />
+                      )}
                       {thread.is_pinned && (
                         <PinIcon className="size-3 shrink-0 text-amber-500 dark:text-amber-400" />
                       )}
