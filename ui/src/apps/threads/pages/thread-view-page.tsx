@@ -9,6 +9,7 @@ import { useNavigate, useParams } from "react-router";
 import { FileBrowser } from "@/apps/threads/components/file-browser";
 import { GitPanel } from "@/apps/threads/components/git-panel";
 import { MessageInput } from "@/apps/threads/components/message-input";
+import { ShareThreadDialog } from "@/apps/threads/components/share-thread-dialog";
 import { ThreadBanners } from "@/apps/threads/components/thread-banners";
 import {
   resolveModel,
@@ -49,6 +50,7 @@ export default function ThreadViewPage() {
   const [isWorkspaceSelectorOpen, setIsWorkspaceSelectorOpen] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [isUsageOpen, setIsUsageOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   // Scroll-to-bottom state
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -409,6 +411,7 @@ export default function ThreadViewPage() {
           onToggleContext={() => setIsContextOpen((v) => !v)}
           isUsageOpen={isUsageOpen}
           onToggleUsage={() => setIsUsageOpen((v) => !v)}
+          onOpenShare={() => setIsShareDialogOpen(true)}
           onExport={handleExport}
           onTogglePin={handleTogglePin}
           onToggleArchive={handleToggleArchive}
@@ -528,6 +531,22 @@ export default function ThreadViewPage() {
               queryClient.invalidateQueries({
                 queryKey: ["threads", thread.machine_id],
               });
+            }}
+          />
+        )}
+
+        {thread && (
+          <ShareThreadDialog
+            open={isShareDialogOpen}
+            onOpenChange={setIsShareDialogOpen}
+            threadId={thread.id}
+            shareToken={thread.share_token}
+            onShareChange={(token) => {
+              queryClient.setQueryData(
+                ["thread", threadId],
+                (old: typeof thread) =>
+                  old ? { ...old, share_token: token } : old,
+              );
             }}
           />
         )}

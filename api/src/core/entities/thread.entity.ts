@@ -34,6 +34,9 @@ export class Thread {
   @Column('boolean', { default: false })
   is_pinned: boolean;
 
+  @Column('varchar', { length: 36, nullable: true, unique: true })
+  share_token: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 

@@ -8,6 +8,7 @@ import {
   FolderOpenIcon,
   GitBranchIcon,
   InfoIcon,
+  LinkIcon,
   PencilIcon,
   PinIcon,
   PinOffIcon,
@@ -25,6 +26,7 @@ interface ThreadViewHeaderProps {
         title: string | null;
         status: string;
         is_pinned: boolean;
+        share_token: string | null;
         workspace_name: string | null;
         working_directory: string | null;
       }
@@ -53,6 +55,8 @@ interface ThreadViewHeaderProps {
   onToggleContext: () => void;
   isUsageOpen: boolean;
   onToggleUsage: () => void;
+  // Share
+  onOpenShare: () => void;
   // Actions
   onExport: () => void;
   onTogglePin: () => void;
@@ -82,6 +86,7 @@ export function ThreadViewHeader({
   onToggleContext,
   isUsageOpen,
   onToggleUsage,
+  onOpenShare,
   onExport,
   onTogglePin,
   onToggleArchive,
@@ -193,6 +198,15 @@ export function ThreadViewHeader({
               title="Export as Markdown"
             >
               <DownloadIcon className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onOpenShare}
+              className={`shrink-0 ${thread?.share_token ? "text-blue-500 dark:text-blue-400" : "text-muted-foreground"}`}
+              title={thread?.share_token ? "Manage share link" : "Share thread"}
+            >
+              <LinkIcon className="size-4" />
             </Button>
             <Button
               variant="ghost"

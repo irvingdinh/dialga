@@ -217,6 +217,7 @@ export class ThreadsController {
       title: t.title,
       status: t.status,
       is_pinned: t.is_pinned,
+      share_token: t.share_token || null,
       created_at: t.created_at,
       updated_at: t.updated_at,
     };
@@ -241,9 +242,24 @@ export class ThreadsController {
       title: t.title,
       status: t.status,
       is_pinned: t.is_pinned,
+      share_token: t.share_token || null,
       created_at: t.created_at,
       updated_at: t.updated_at,
     };
+  }
+
+  @Post('threads/:id/share')
+  async share(@CurrentUser() user: User, @Param('id') id: string) {
+    const t = await this.threadsService.share(id, user.id);
+    return {
+      share_token: t.share_token,
+    };
+  }
+
+  @Delete('threads/:id/share')
+  async unshare(@CurrentUser() user: User, @Param('id') id: string) {
+    await this.threadsService.unshare(id, user.id);
+    return { success: true };
   }
 
   @Get('threads/:id/export.md')
@@ -272,5 +288,47 @@ export class ThreadsController {
   async remove(@CurrentUser() user: User, @Param('id') id: string) {
     await this.threadsService.remove(id, user.id);
     return { success: true };
+  }
+}
+
+@Controller('api/shared')
+export class SharedThreadsController {
+  constructor(private readonly threadsService: ThreadsService) {}
+
+  @Get(':token')
+  async findByShareToken(@Param('token') token: string) {
+    const { thread, messages } =
+      await this.threadsService.findByShareToken(token);
+    return {
+      thread: {
+        id: thread.id,
+        title: thread.title,
+        workspace_name: thread.workspace?.name || null,
+        created_at: thread.created_at,
+        updated_at: thread.updated_at,
+      },
+      messages: messages.map((m) => {
+        let parsedMetadata = null;
+        if (m.metadata) {
+          try {
+            parsedMetadata =
+              typeof m.metadata === 'string'
+                ? JSON.parse(m.metadata)
+                : m.metadata;
+          } catch {
+            /* ignore */
+          }
+        }
+        return {
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          model: m.model,
+          status: m.status,
+          metadata: parsedMetadata,
+          created_at: m.created_at,
+        };
+      }),
+    };
   }
 }

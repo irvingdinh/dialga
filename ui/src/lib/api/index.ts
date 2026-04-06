@@ -6,6 +6,7 @@ export { fsApi } from "./fs";
 export { gitApi } from "./git";
 export { machinesApi } from "./machines";
 export { messagesApi } from "./messages";
+export { sharedApi, type SharedMessage, type SharedThread } from "./shared";
 export { threadsApi } from "./threads";
 export { workspacesApi } from "./workspaces";
 
@@ -16,6 +17,7 @@ import { fsApi } from "./fs";
 import { gitApi } from "./git";
 import { machinesApi } from "./machines";
 import { messagesApi } from "./messages";
+import { sharedApi } from "./shared";
 import { threadsApi } from "./threads";
 import { workspacesApi } from "./workspaces";
 
@@ -31,4 +33,5 @@ export const api = {
   activity: activityApi,
   usage: usageApi,
   agentLogs: agentLogsApi,
+  shared: sharedApi,
 };

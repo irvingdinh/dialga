@@ -90,6 +90,7 @@ export const threadsApi = {
       title: string | null;
       status: string;
       is_pinned: boolean;
+      share_token: string | null;
       created_at: string;
       updated_at: string;
     }>(`/api/threads/${threadId}`),
@@ -168,6 +169,14 @@ export const threadsApi = {
     }>(`/api/threads/${threadId}/fork`, {
       method: "POST",
       body: JSON.stringify({ after_message_id: afterMessageId }),
+    }),
+  share: (threadId: string) =>
+    request<{ share_token: string }>(`/api/threads/${threadId}/share`, {
+      method: "POST",
+    }),
+  unshare: (threadId: string) =>
+    request<{ success: true }>(`/api/threads/${threadId}/share`, {
+      method: "DELETE",
     }),
   exportMarkdown: async (threadId: string): Promise<void> => {
     const res = await fetch(`/api/threads/${threadId}/export.md`, {

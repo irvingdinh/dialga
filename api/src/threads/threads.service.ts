@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { uuidv7 } from 'uuidv7';
 
 import { Machine, Message, Thread, Workspace } from '../core/entities/index.js';
 
@@ -530,6 +531,39 @@ export class ThreadsService {
 
     // Re-fetch with relations for the response
     return this.findOne(newThread.id, userId);
+  }
+
+  async share(id: string, userId: string): Promise<Thread> {
+    const thread = await this.findOne(id, userId);
+    if (!thread.share_token) {
+      thread.share_token = uuidv7();
+      await this.threadRepository.save(thread);
+    }
+    return thread;
+  }
+
+  async unshare(id: string, userId: string): Promise<Thread> {
+    const thread = await this.findOne(id, userId);
+    thread.share_token = null;
+    await this.threadRepository.save(thread);
+    return thread;
+  }
+
+  async findByShareToken(
+    token: string,
+  ): Promise<{ thread: Thread; messages: Message[] }> {
+    const thread = await this.threadRepository.findOne({
+      where: { share_token: token },
+      relations: ['workspace', 'machine'],
+    });
+    if (!thread) throw new NotFoundException('Shared thread not found');
+
+    const messages = await this.messageRepository.find({
+      where: { thread_id: thread.id },
+      order: { created_at: 'ASC' },
+    });
+
+    return { thread, messages };
   }
 
   async remove(id: string, userId: string): Promise<void> {

@@ -3,7 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from '../auth/auth.module.js';
 import { Machine, Message, Thread, Workspace } from '../core/entities/index.js';
-import { ThreadsController } from './threads.controller.js';
+import {
+  SharedThreadsController,
+  ThreadsController,
+} from './threads.controller.js';
 import { ThreadsService } from './threads.service.js';
 
 @Module({
@@ -11,7 +14,7 @@ import { ThreadsService } from './threads.service.js';
     TypeOrmModule.forFeature([Thread, Machine, Message, Workspace]),
     AuthModule,
   ],
-  controllers: [ThreadsController],
+  controllers: [ThreadsController, SharedThreadsController],
   providers: [ThreadsService],
   exports: [ThreadsService],
 })

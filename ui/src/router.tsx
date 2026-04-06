@@ -1,5 +1,11 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useParams,
+} from "react-router";
 
 import { ProtectedRoute } from "@/apps/auth/protected-route";
 import { CommandPalette } from "@/components/command-palette";
@@ -25,6 +31,15 @@ const AllThreadsPage = lazy(
   () => import("./apps/threads/pages/all-threads-page"),
 );
 const SettingsPage = lazy(() => import("./apps/settings/pages/settings-page"));
+const SharedThreadPage = lazy(
+  () => import("./apps/shared/pages/shared-thread-page"),
+);
+
+function SharedThreadRoute() {
+  const { token } = useParams<{ token: string }>();
+  if (!token) return <Navigate to="/machines" replace />;
+  return <SharedThreadPage shareToken={token} />;
+}
 
 export const Router = () => {
   return (
@@ -112,6 +127,14 @@ export const Router = () => {
                   <SettingsPage />
                 </ErrorBoundary>
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/shared/:token"
+            element={
+              <ErrorBoundary>
+                <SharedThreadRoute />
+              </ErrorBoundary>
             }
           />
           <Route path="*" element={<Navigate to="/machines" replace />} />
