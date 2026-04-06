@@ -514,4 +514,24 @@ export const api = {
       URL.revokeObjectURL(url);
     },
   },
+
+  usage: {
+    summary: () =>
+      request<{
+        total_cost_usd: number;
+        total_input_tokens: number;
+        total_output_tokens: number;
+        total_duration_ms: number;
+        message_count: number;
+        models: Record<string, number>;
+        by_machine: Array<{
+          machine_id: string;
+          machine_name: string;
+          total_cost_usd: number;
+          total_input_tokens: number;
+          total_output_tokens: number;
+          message_count: number;
+        }>;
+      }>("/api/usage/summary"),
+  },
 };

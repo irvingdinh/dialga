@@ -39,6 +39,11 @@ export class MessagesController {
     return { tasks };
   }
 
+  @Get('usage/summary')
+  async getGlobalUsage(@CurrentUser() user: User) {
+    return this.messagesService.getGlobalUsage(user.id);
+  }
+
   @Get('activity/recent')
   async listRecent(
     @CurrentUser() user: User,

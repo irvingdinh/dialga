@@ -476,6 +476,131 @@ export class MessagesService {
     };
   }
 
+  async getGlobalUsage(userId: string): Promise<{
+    total_cost_usd: number;
+    total_input_tokens: number;
+    total_output_tokens: number;
+    total_duration_ms: number;
+    message_count: number;
+    models: Record<string, number>;
+    by_machine: Array<{
+      machine_id: string;
+      machine_name: string;
+      total_cost_usd: number;
+      total_input_tokens: number;
+      total_output_tokens: number;
+      message_count: number;
+    }>;
+  }> {
+    // Fetch all completed assistant messages across user's machines with metadata
+    const rows = await this.messageRepository
+      .createQueryBuilder('msg')
+      .innerJoin('msg.thread', 'thread')
+      .innerJoin('thread.machine', 'machine')
+      .select([
+        'msg.metadata AS metadata',
+        'msg.model AS model',
+        'machine.id AS machine_id',
+        'machine.name AS machine_name',
+      ])
+      .where('msg.role = :role', { role: 'assistant' })
+      .andWhere('msg.status = :status', { status: 'completed' })
+      .andWhere('machine.user_id = :userId', { userId })
+      .andWhere('machine.deleted_at IS NULL')
+      .getRawMany<{
+        metadata: string | null;
+        model: string | null;
+        machine_id: string;
+        machine_name: string;
+      }>();
+
+    let totalCost = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalDuration = 0;
+    let messageCount = 0;
+    const models: Record<string, number> = {};
+    const machineMap = new Map<
+      string,
+      {
+        machine_id: string;
+        machine_name: string;
+        total_cost_usd: number;
+        total_input_tokens: number;
+        total_output_tokens: number;
+        message_count: number;
+      }
+    >();
+
+    for (const row of rows) {
+      if (!row.metadata) continue;
+
+      let parsed: {
+        events?: Array<{ type: string; metadata?: Record<string, unknown> }>;
+      };
+      try {
+        parsed =
+          typeof row.metadata === 'string'
+            ? JSON.parse(row.metadata)
+            : row.metadata;
+      } catch {
+        continue;
+      }
+
+      if (!parsed.events || !Array.isArray(parsed.events)) continue;
+
+      for (const event of parsed.events) {
+        if (event.type === 'result' && event.metadata) {
+          const cost = event.metadata.total_cost_usd as number | undefined;
+          const duration = event.metadata.duration_ms as number | undefined;
+          const usage = event.metadata.usage as
+            | { input_tokens?: number; output_tokens?: number }
+            | undefined;
+
+          if (cost) totalCost += cost;
+          if (duration) totalDuration += duration;
+          if (usage?.input_tokens) totalInputTokens += usage.input_tokens;
+          if (usage?.output_tokens) totalOutputTokens += usage.output_tokens;
+          messageCount++;
+
+          // Per-machine aggregation
+          if (!machineMap.has(row.machine_id)) {
+            machineMap.set(row.machine_id, {
+              machine_id: row.machine_id,
+              machine_name: row.machine_name,
+              total_cost_usd: 0,
+              total_input_tokens: 0,
+              total_output_tokens: 0,
+              message_count: 0,
+            });
+          }
+          const m = machineMap.get(row.machine_id)!;
+          if (cost) m.total_cost_usd += cost;
+          if (usage?.input_tokens) m.total_input_tokens += usage.input_tokens;
+          if (usage?.output_tokens)
+            m.total_output_tokens += usage.output_tokens;
+          m.message_count++;
+        }
+      }
+
+      if (row.model) {
+        models[row.model] = (models[row.model] || 0) + 1;
+      }
+    }
+
+    return {
+      total_cost_usd: totalCost,
+      total_input_tokens: totalInputTokens,
+      total_output_tokens: totalOutputTokens,
+      total_duration_ms: totalDuration,
+      message_count: messageCount,
+      models,
+      by_machine: Array.from(machineMap.values()).sort(
+        (a, b) => b.total_cost_usd - a.total_cost_usd,
+      ),
+    };
+  }
+
   async getAsJsonl(threadId: string): Promise<string> {
     const messages = await this.messageRepository.find({
       where: { thread_id: threadId },
