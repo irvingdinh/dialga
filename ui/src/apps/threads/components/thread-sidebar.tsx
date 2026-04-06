@@ -10,25 +10,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { CreateThreadDialog } from "@/apps/threads/components/create-thread-dialog";
+import { timeAgo } from "@/apps/threads/components/thread-list-shared";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { useUnread } from "@/lib/unread";
-
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const seconds = Math.floor((now - then) / 1000);
-
-  if (seconds < 60) return "now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d`;
-  return new Date(dateStr).toLocaleDateString();
-}
 
 interface ThreadSidebarProps {
   machineId: string;
@@ -170,7 +156,7 @@ export function ThreadSidebar({
                       </span>
                     </span>
                     <span className="text-muted-foreground shrink-0 text-[10px]">
-                      {timeAgo(thread.updated_at)}
+                      {timeAgo(thread.updated_at, true)}
                     </span>
                   </div>
                   <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[11px]">
