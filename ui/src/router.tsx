@@ -17,6 +17,9 @@ const ThreadsPage = lazy(() => import("./apps/threads/pages/threads-page"));
 const ThreadViewPage = lazy(
   () => import("./apps/threads/pages/thread-view-page"),
 );
+const AllThreadsPage = lazy(
+  () => import("./apps/threads/pages/all-threads-page"),
+);
 const SettingsPage = lazy(() => import("./apps/settings/pages/settings-page"));
 
 export const Router = () => {
@@ -52,6 +55,16 @@ export const Router = () => {
               <ProtectedRoute>
                 <ErrorBoundary>
                   <MachineSettingsPage />
+                </ErrorBoundary>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/threads"
+            element={
+              <ProtectedRoute>
+                <ErrorBoundary>
+                  <AllThreadsPage />
                 </ErrorBoundary>
               </ProtectedRoute>
             }

@@ -153,6 +153,63 @@ export class ThreadsService {
     return { messageCounts, latestMessages };
   }
 
+  async listAll(
+    userId: string,
+    options: {
+      machineId?: string;
+      status?: string;
+      q?: string;
+      sort?: string;
+    },
+  ): Promise<Thread[]> {
+    const qb = this.threadRepository
+      .createQueryBuilder('thread')
+      .innerJoinAndSelect('thread.machine', 'machine')
+      .leftJoinAndSelect('thread.workspace', 'workspace')
+      .where('machine.user_id = :userId', { userId })
+      .andWhere('machine.deleted_at IS NULL');
+
+    if (options.machineId) {
+      qb.andWhere('thread.machine_id = :machineId', {
+        machineId: options.machineId,
+      });
+    }
+
+    if (options.status === 'archived') {
+      qb.andWhere('thread.status = :status', { status: 'archived' });
+    } else if (options.status !== 'all') {
+      qb.andWhere('thread.status = :status', { status: 'active' });
+    }
+
+    if (options.q) {
+      qb.leftJoin('thread.messages', 'message')
+        .andWhere('(thread.title LIKE :q OR message.content LIKE :q)', {
+          q: `%${options.q}%`,
+        })
+        .groupBy('thread.id')
+        .addGroupBy('machine.id')
+        .addGroupBy('workspace.id');
+    }
+
+    qb.orderBy('thread.is_pinned', 'DESC');
+    switch (options.sort) {
+      case 'created':
+        qb.addOrderBy('thread.created_at', 'DESC');
+        break;
+      case 'created_asc':
+        qb.addOrderBy('thread.created_at', 'ASC');
+        break;
+      case 'title':
+        qb.addOrderBy('thread.title', 'ASC');
+        break;
+      default:
+        qb.addOrderBy('thread.updated_at', 'DESC');
+        break;
+    }
+
+    return qb.getMany();
+  }
+
   async searchGlobal(
     userId: string,
     q: string,

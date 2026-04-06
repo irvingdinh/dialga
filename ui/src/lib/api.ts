@@ -383,6 +383,40 @@ export const api = {
   },
 
   threads: {
+    listAll: (params?: {
+      machine_id?: string;
+      status?: string;
+      q?: string;
+      sort?: string;
+    }) => {
+      const sp = new URLSearchParams();
+      if (params?.machine_id) sp.set("machine_id", params.machine_id);
+      if (params?.status) sp.set("status", params.status);
+      if (params?.q) sp.set("q", params.q);
+      if (params?.sort) sp.set("sort", params.sort);
+      const query = sp.toString() ? `?${sp.toString()}` : "";
+      return request<
+        Array<{
+          id: string;
+          machine_id: string;
+          machine_name: string | null;
+          machine_status: string;
+          workspace_id: string | null;
+          workspace_name: string | null;
+          title: string | null;
+          status: string;
+          is_pinned: boolean;
+          message_count: number;
+          latest_message: {
+            role: string;
+            content: string;
+            status: string;
+          } | null;
+          created_at: string;
+          updated_at: string;
+        }>
+      >(`/api/threads${query}`);
+    },
     list: (
       machineId: string,
       params?: { status?: string; q?: string; sort?: string },

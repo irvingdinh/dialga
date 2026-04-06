@@ -7,6 +7,7 @@ import {
   CoinsIcon,
   FolderIcon,
   HashIcon,
+  InboxIcon,
   LoaderIcon,
   MessageSquareIcon,
   MessageSquarePlusIcon,
@@ -637,6 +638,14 @@ export default function MachinesPage() {
           <p className="text-muted-foreground text-xs">{user?.email}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => navigate("/threads")}
+            title="All Threads"
+          >
+            <InboxIcon className="size-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"

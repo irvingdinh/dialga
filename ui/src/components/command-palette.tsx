@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  InboxIcon,
   KeyboardIcon,
   LogOutIcon,
   MessageSquareIcon,
@@ -229,6 +230,13 @@ export function CommandPalette() {
                   <KeyboardIcon className="text-muted-foreground mr-2 h-4 w-4" />
                   <span className="flex-1">Keyboard shortcuts</span>
                   <CommandShortcut>?</CommandShortcut>
+                </CommandItem>
+                <CommandItem
+                  value="all-threads-inbox"
+                  onSelect={() => navigateTo("/threads")}
+                >
+                  <InboxIcon className="text-muted-foreground mr-2 h-4 w-4" />
+                  <span className="flex-1">All threads</span>
                 </CommandItem>
                 <CommandItem
                   value="go-home-machines"

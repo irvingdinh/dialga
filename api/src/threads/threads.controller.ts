@@ -149,6 +149,40 @@ export class ThreadsController {
     };
   }
 
+  @Get('threads')
+  async listAll(
+    @CurrentUser() user: User,
+    @Query('machine_id') machineId?: string,
+    @Query('status') status?: string,
+    @Query('q') q?: string,
+    @Query('sort') sort?: string,
+  ) {
+    const threads = await this.threadsService.listAll(user.id, {
+      machineId,
+      status,
+      q,
+      sort,
+    });
+    const { messageCounts, latestMessages } =
+      await this.threadsService.getListMetadata(threads.map((t) => t.id));
+
+    return threads.map((t) => ({
+      id: t.id,
+      machine_id: t.machine_id,
+      machine_name: t.machine?.name || null,
+      machine_status: t.machine?.status || 'offline',
+      workspace_id: t.workspace_id,
+      workspace_name: t.workspace?.name || null,
+      title: t.title,
+      status: t.status,
+      is_pinned: t.is_pinned,
+      message_count: messageCounts[t.id] || 0,
+      latest_message: latestMessages[t.id] || null,
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+    }));
+  }
+
   @Post('threads/bulk')
   async bulk(@CurrentUser() user: User, @Body() dto: BulkThreadDto) {
     const count = await this.threadsService.bulk(
