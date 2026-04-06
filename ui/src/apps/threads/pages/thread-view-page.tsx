@@ -10,11 +10,15 @@ import {
   ArchiveRestoreIcon,
   ArrowDownIcon,
   ArrowLeftIcon,
+  BarChart3Icon,
   ChevronUpIcon,
+  ClockIcon,
+  CoinsIcon,
   DownloadIcon,
   FolderIcon,
   FolderOpenIcon,
   GitBranchIcon,
+  HashIcon,
   LoaderIcon,
   MessageSquareIcon,
   PencilIcon,
@@ -108,6 +112,9 @@ export default function ThreadViewPage() {
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const isNearBottomRef = useRef(true);
 
+  // Usage stats state
+  const [isUsageOpen, setIsUsageOpen] = useState(false);
+
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -168,6 +175,14 @@ export default function ThreadViewPage() {
     queryKey: ["messages-search", threadId, searchQuery],
     queryFn: () => api.messages.list(threadId!, { q: searchQuery }),
     enabled: !!threadId && !!searchQuery,
+  });
+
+  // Thread usage stats
+  const { data: usageData } = useQuery({
+    queryKey: ["thread-usage", threadId],
+    queryFn: () => api.threads.usage(threadId!),
+    enabled: !!threadId && isUsageOpen,
+    staleTime: 30_000,
   });
 
   // Debounce search input
@@ -250,9 +265,12 @@ export default function ThreadViewPage() {
           next.delete(data.message_id);
           return next;
         });
-        // Refetch messages to get final state
+        // Refetch messages and usage to get final state
         queryClient.invalidateQueries({ queryKey: ["messages", threadId] });
         queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+        queryClient.invalidateQueries({
+          queryKey: ["thread-usage", threadId],
+        });
         // Keep thread marked as read while viewing
         if (threadId) markAsRead(threadId);
       } catch {
@@ -678,6 +696,15 @@ export default function ThreadViewPage() {
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  onClick={() => setIsUsageOpen((v) => !v)}
+                  className={`shrink-0 ${isUsageOpen ? "text-foreground" : "text-muted-foreground"}`}
+                  title="Thread usage stats"
+                >
+                  <BarChart3Icon className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={handleExport}
                   className="text-muted-foreground shrink-0"
                   title="Export as Markdown"
@@ -754,6 +781,69 @@ export default function ThreadViewPage() {
               )}
               {searchLoading && searchQuery && (
                 <LoaderIcon className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Usage Stats Bar */}
+        {isUsageOpen && (
+          <div className="border-b px-4 py-2">
+            <div className="mx-auto max-w-lg">
+              {usageData && usageData.message_count > 0 ? (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  {usageData.total_cost_usd > 0 && (
+                    <span className="text-foreground flex items-center gap-1 font-medium">
+                      <CoinsIcon className="size-3 shrink-0" />$
+                      {usageData.total_cost_usd.toFixed(4)}
+                    </span>
+                  )}
+                  {(usageData.total_input_tokens > 0 ||
+                    usageData.total_output_tokens > 0) && (
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <HashIcon className="size-3 shrink-0" />
+                      {(
+                        usageData.total_input_tokens +
+                        usageData.total_output_tokens
+                      ).toLocaleString()}{" "}
+                      tokens
+                      <span className="opacity-60">
+                        ({usageData.total_input_tokens.toLocaleString()} in /{" "}
+                        {usageData.total_output_tokens.toLocaleString()} out)
+                      </span>
+                    </span>
+                  )}
+                  {usageData.total_duration_ms > 0 && (
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <ClockIcon className="size-3 shrink-0" />
+                      {usageData.total_duration_ms >= 60000
+                        ? `${(usageData.total_duration_ms / 60000).toFixed(1)}m`
+                        : `${(usageData.total_duration_ms / 1000).toFixed(1)}s`}
+                    </span>
+                  )}
+                  {usageData.message_count > 0 && (
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <MessageSquareIcon className="size-3 shrink-0" />
+                      {usageData.message_count} response
+                      {usageData.message_count !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {Object.keys(usageData.models).length > 0 && (
+                    <span className="text-muted-foreground opacity-60">
+                      {Object.entries(usageData.models)
+                        .map(([model, count]) =>
+                          count > 1 ? `${model} ×${count}` : model,
+                        )
+                        .join(", ")}
+                    </span>
+                  )}
+                </div>
+              ) : usageData ? (
+                <p className="text-muted-foreground text-xs">
+                  No usage data yet.
+                </p>
+              ) : (
+                <p className="text-muted-foreground text-xs">Loading...</p>
               )}
             </div>
           </div>

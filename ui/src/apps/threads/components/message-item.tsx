@@ -199,6 +199,22 @@ function ToolResultBlock({ content }: { content: string }) {
   );
 }
 
+export function extractUsageFromMetadata(metadata: Record<string, unknown>): {
+  inputTokens?: number;
+  outputTokens?: number;
+  durationMs?: number;
+  costUsd?: number;
+} {
+  const usage = metadata.usage as
+    | { input_tokens?: number; output_tokens?: number }
+    | undefined;
+  const inputTokens = usage?.input_tokens;
+  const outputTokens = usage?.output_tokens;
+  const durationMs = metadata.duration_ms as number | undefined;
+  const costUsd = metadata.total_cost_usd as number | undefined;
+  return { inputTokens, outputTokens, durationMs, costUsd };
+}
+
 function ResultFooter({
   metadata,
 }: {
@@ -206,17 +222,22 @@ function ResultFooter({
   content: string;
 }) {
   if (!metadata) return null;
-  const tokens = metadata.tokens_used as number | undefined;
-  const durationMs = metadata.duration_ms as number | undefined;
-  const cost = metadata.total_cost_usd as number | undefined;
+  const { inputTokens, outputTokens, durationMs, costUsd } =
+    extractUsageFromMetadata(metadata);
+  const totalTokens =
+    inputTokens !== undefined || outputTokens !== undefined
+      ? (inputTokens ?? 0) + (outputTokens ?? 0)
+      : undefined;
 
   return (
     <div className="text-muted-foreground mt-2 flex flex-wrap gap-3 text-[11px]">
-      {tokens !== undefined && <span>{tokens.toLocaleString()} tokens</span>}
+      {totalTokens !== undefined && (
+        <span>{totalTokens.toLocaleString()} tokens</span>
+      )}
       {durationMs !== undefined && (
         <span>{(durationMs / 1000).toFixed(1)}s</span>
       )}
-      {cost !== undefined && <span>${cost.toFixed(4)}</span>}
+      {costUsd !== undefined && <span>${costUsd.toFixed(4)}</span>}
     </div>
   );
 }

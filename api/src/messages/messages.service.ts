@@ -399,6 +399,83 @@ export class MessagesService {
     return rows;
   }
 
+  async getThreadUsage(
+    threadId: string,
+    userId: string,
+  ): Promise<{
+    total_cost_usd: number;
+    total_input_tokens: number;
+    total_output_tokens: number;
+    total_duration_ms: number;
+    message_count: number;
+    models: Record<string, number>;
+  }> {
+    await this.verifyThreadOwnership(threadId, userId);
+
+    const messages = await this.messageRepository.find({
+      where: {
+        thread_id: threadId,
+        role: 'assistant',
+        status: 'completed',
+      },
+      select: ['metadata', 'model'],
+    });
+
+    let totalCost = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalDuration = 0;
+    let messageCount = 0;
+    const models: Record<string, number> = {};
+
+    for (const msg of messages) {
+      if (!msg.metadata) continue;
+
+      let parsed: {
+        events?: Array<{ type: string; metadata?: Record<string, unknown> }>;
+      };
+      try {
+        parsed =
+          typeof msg.metadata === 'string'
+            ? JSON.parse(msg.metadata)
+            : msg.metadata;
+      } catch {
+        continue;
+      }
+
+      if (!parsed.events || !Array.isArray(parsed.events)) continue;
+
+      for (const event of parsed.events) {
+        if (event.type === 'result' && event.metadata) {
+          const cost = event.metadata.total_cost_usd as number | undefined;
+          const duration = event.metadata.duration_ms as number | undefined;
+          const usage = event.metadata.usage as
+            | { input_tokens?: number; output_tokens?: number }
+            | undefined;
+
+          if (cost) totalCost += cost;
+          if (duration) totalDuration += duration;
+          if (usage?.input_tokens) totalInputTokens += usage.input_tokens;
+          if (usage?.output_tokens) totalOutputTokens += usage.output_tokens;
+          messageCount++;
+        }
+      }
+
+      if (msg.model) {
+        models[msg.model] = (models[msg.model] || 0) + 1;
+      }
+    }
+
+    return {
+      total_cost_usd: totalCost,
+      total_input_tokens: totalInputTokens,
+      total_output_tokens: totalOutputTokens,
+      total_duration_ms: totalDuration,
+      message_count: messageCount,
+      models,
+    };
+  }
+
   async getAsJsonl(threadId: string): Promise<string> {
     const messages = await this.messageRepository.find({
       where: { thread_id: threadId },

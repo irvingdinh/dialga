@@ -483,6 +483,15 @@ export const api = {
           updated_at: string;
         }>
       >(`/api/threads/search?q=${encodeURIComponent(q)}`),
+    usage: (threadId: string) =>
+      request<{
+        total_cost_usd: number;
+        total_input_tokens: number;
+        total_output_tokens: number;
+        total_duration_ms: number;
+        message_count: number;
+        models: Record<string, number>;
+      }>(`/api/threads/${threadId}/usage`),
     exportMarkdown: async (threadId: string): Promise<void> => {
       const res = await fetch(`/api/threads/${threadId}/export.md`, {
         credentials: "include",

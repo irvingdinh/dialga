@@ -138,6 +138,14 @@ export class MessagesController {
     };
   }
 
+  @Get('threads/:threadId/usage')
+  async getUsage(
+    @CurrentUser() user: User,
+    @Param('threadId') threadId: string,
+  ) {
+    return this.messagesService.getThreadUsage(threadId, user.id);
+  }
+
   @Get('threads/:threadId/messages.jsonl')
   @Header('Content-Type', 'application/x-ndjson')
   async getJsonl(
