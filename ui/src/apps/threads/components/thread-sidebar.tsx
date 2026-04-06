@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FolderIcon,
   MessageSquareIcon,
+  PinIcon,
   PlusIcon,
   SettingsIcon,
 } from "lucide-react";
@@ -150,11 +151,16 @@ export function ThreadSidebar({
                 >
                   <div className="flex w-full items-center gap-2">
                     <span
-                      className={`min-w-0 flex-1 truncate text-[13px] ${
+                      className={`flex min-w-0 flex-1 items-center gap-1 truncate text-[13px] ${
                         isActive ? "font-medium" : ""
                       }`}
                     >
-                      {thread.title ?? "New thread"}
+                      {thread.is_pinned && (
+                        <PinIcon className="size-3 shrink-0 text-amber-500 dark:text-amber-400" />
+                      )}
+                      <span className="truncate">
+                        {thread.title ?? "New thread"}
+                      </span>
                     </span>
                     <span className="text-muted-foreground shrink-0 text-[10px]">
                       {timeAgo(thread.updated_at)}

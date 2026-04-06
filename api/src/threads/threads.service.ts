@@ -68,19 +68,20 @@ export class ThreadsService {
         .addGroupBy('workspace.id');
     }
 
-    // Sort: updated (default), created, title, created_asc
+    // Pinned threads always first, then sort within each group
+    qb.orderBy('thread.is_pinned', 'DESC');
     switch (sort) {
       case 'created':
-        qb.orderBy('thread.created_at', 'DESC');
+        qb.addOrderBy('thread.created_at', 'DESC');
         break;
       case 'created_asc':
-        qb.orderBy('thread.created_at', 'ASC');
+        qb.addOrderBy('thread.created_at', 'ASC');
         break;
       case 'title':
-        qb.orderBy('thread.title', 'ASC');
+        qb.addOrderBy('thread.title', 'ASC');
         break;
       default:
-        qb.orderBy('thread.updated_at', 'DESC');
+        qb.addOrderBy('thread.updated_at', 'DESC');
         break;
     }
 
@@ -226,11 +227,13 @@ export class ThreadsService {
       title?: string;
       status?: 'active' | 'archived';
       workspace_id?: string | null;
+      is_pinned?: boolean;
     },
   ): Promise<Thread> {
     const thread = await this.findOne(id, userId);
     if (data.title !== undefined) thread.title = data.title;
     if (data.status !== undefined) thread.status = data.status;
+    if (data.is_pinned !== undefined) thread.is_pinned = data.is_pinned;
     if (data.workspace_id !== undefined) {
       if (data.workspace_id === null) {
         thread.workspace_id = null;

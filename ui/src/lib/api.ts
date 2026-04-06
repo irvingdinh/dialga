@@ -317,6 +317,7 @@ export const api = {
           workspace_name: string | null;
           title: string | null;
           status: string;
+          is_pinned: boolean;
           message_count: number;
           latest_message: {
             role: string;
@@ -350,6 +351,7 @@ export const api = {
         working_directory: string | null;
         title: string | null;
         status: string;
+        is_pinned: boolean;
         created_at: string;
         updated_at: string;
       }>(`/api/threads/${threadId}`),
@@ -359,6 +361,7 @@ export const api = {
         title?: string;
         status?: string;
         workspace_id?: string | null;
+        is_pinned?: boolean;
       },
     ) =>
       request<{
@@ -369,6 +372,7 @@ export const api = {
         working_directory: string | null;
         title: string | null;
         status: string;
+        is_pinned: boolean;
         created_at: string;
         updated_at: string;
       }>(`/api/threads/${threadId}`, {

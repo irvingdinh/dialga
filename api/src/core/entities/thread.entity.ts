@@ -31,6 +31,9 @@ export class Thread {
   @Column('enum', { enum: ['active', 'archived'], default: 'active' })
   status: 'active' | 'archived';
 
+  @Column('boolean', { default: false })
+  is_pinned: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 

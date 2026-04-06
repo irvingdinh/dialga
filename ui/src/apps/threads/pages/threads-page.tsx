@@ -6,6 +6,8 @@ import {
   ArrowLeftIcon,
   FolderIcon,
   MessageSquareIcon,
+  PinIcon,
+  PinOffIcon,
   PlusIcon,
   SearchIcon,
   SettingsIcon,
@@ -243,6 +245,20 @@ export default function ThreadsPage() {
     [machineId, queryClient],
   );
 
+  const handleTogglePin = useCallback(
+    async (threadId: string, isPinned: boolean) => {
+      try {
+        await api.threads.update(threadId, { is_pinned: !isPinned });
+        queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : "Failed to update thread";
+        toast.error(message);
+      }
+    },
+    [machineId, queryClient],
+  );
+
   const isOffline = machine?.status === "offline";
 
   return (
@@ -438,7 +454,11 @@ export default function ThreadsPage() {
                     onClick={() => navigate(`/threads/${thread.id}`)}
                     className="flex min-w-0 flex-1 items-start gap-3 text-left"
                   >
-                    <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
+                    {thread.is_pinned ? (
+                      <PinIcon className="mt-0.5 size-4 shrink-0 text-amber-500 dark:text-amber-400" />
+                    ) : (
+                      <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">
                         {thread.title ?? "New thread"}
@@ -485,6 +505,20 @@ export default function ThreadsPage() {
                     </div>
                   </button>
                   <div className="mt-0.5 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTogglePin(thread.id, thread.is_pinned);
+                      }}
+                      className={`hover:text-foreground ${thread.is_pinned ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/40"}`}
+                      title={thread.is_pinned ? "Unpin thread" : "Pin thread"}
+                    >
+                      {thread.is_pinned ? (
+                        <PinOffIcon className="size-4" />
+                      ) : (
+                        <PinIcon className="size-4" />
+                      )}
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

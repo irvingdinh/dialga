@@ -11,7 +11,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import type { Response } from 'express';
 
 import { CurrentUser } from '../core/decorators/current-user.decorator.js';
@@ -40,6 +40,10 @@ class UpdateThreadDto {
 
   @IsOptional()
   workspace_id?: string | null;
+
+  @IsBoolean()
+  @IsOptional()
+  is_pinned?: boolean;
 }
 
 @Controller('api')
@@ -74,6 +78,7 @@ export class ThreadsController {
       workspace_name: t.workspace?.name || null,
       title: t.title,
       status: t.status,
+      is_pinned: t.is_pinned,
       message_count: messageCounts[t.id] || 0,
       latest_message: latestMessages[t.id] || null,
       created_at: t.created_at,
@@ -94,6 +99,7 @@ export class ThreadsController {
       workspace_id: t.workspace_id,
       title: t.title,
       status: t.status,
+      is_pinned: t.is_pinned,
       created_at: t.created_at,
       updated_at: t.updated_at,
     };
@@ -116,6 +122,7 @@ export class ThreadsController {
       working_directory: t.workspace?.working_directory || null,
       title: t.title,
       status: t.status,
+      is_pinned: t.is_pinned,
       created_at: t.created_at,
       updated_at: t.updated_at,
     };
@@ -136,6 +143,7 @@ export class ThreadsController {
       working_directory: t.workspace?.working_directory || null,
       title: t.title,
       status: t.status,
+      is_pinned: t.is_pinned,
       created_at: t.created_at,
       updated_at: t.updated_at,
     };

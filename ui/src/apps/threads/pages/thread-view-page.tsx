@@ -18,6 +18,8 @@ import {
   LoaderIcon,
   MessageSquareIcon,
   PencilIcon,
+  PinIcon,
+  PinOffIcon,
   SearchIcon,
   Trash2Icon,
   WifiOffIcon,
@@ -369,6 +371,21 @@ export default function ThreadViewPage() {
     }
   }, [threadId, thread, queryClient]);
 
+  const handleTogglePin = useCallback(async () => {
+    if (!threadId || !thread) return;
+    try {
+      await api.threads.update(threadId, { is_pinned: !thread.is_pinned });
+      queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+      queryClient.invalidateQueries({
+        queryKey: ["threads", thread.machine_id],
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Failed to update thread";
+      toast.error(message);
+    }
+  }, [threadId, thread, queryClient]);
+
   const handleSend = useCallback(
     async (content: string, model?: string) => {
       if (!threadId) return;
@@ -656,6 +673,19 @@ export default function ThreadViewPage() {
                   title="Export as Markdown"
                 >
                   <DownloadIcon className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleTogglePin}
+                  className={`shrink-0 ${thread?.is_pinned ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground"}`}
+                  title={thread?.is_pinned ? "Unpin thread" : "Pin thread"}
+                >
+                  {thread?.is_pinned ? (
+                    <PinOffIcon className="size-4" />
+                  ) : (
+                    <PinIcon className="size-4" />
+                  )}
                 </Button>
                 <Button
                   variant="ghost"
