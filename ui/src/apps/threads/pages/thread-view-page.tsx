@@ -206,6 +206,50 @@ export default function ThreadViewPage() {
     [messagesData],
   );
 
+  // Extract partial metadata events for running messages as initial streaming state
+  // (allows page refresh to show accumulated progress instead of bare "Running...")
+  const partialEvents = useMemo(() => {
+    const result = new Map<string, StreamEvent[]>();
+    for (const msg of messages) {
+      if (
+        msg.role === "assistant" &&
+        msg.status === "running" &&
+        msg.metadata
+      ) {
+        try {
+          const meta =
+            typeof msg.metadata === "string"
+              ? JSON.parse(msg.metadata)
+              : msg.metadata;
+          if (meta?.partial && Array.isArray(meta.events)) {
+            const seeded: StreamEvent[] = meta.events.map(
+              (evt: { type: string; content: string }) => ({
+                message_id: msg.id,
+                type: evt.type,
+                content: evt.content,
+              }),
+            );
+            if (seeded.length > 0) {
+              result.set(msg.id, seeded);
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+    return result;
+  }, [messages]);
+
+  // Merge: SSE streaming events take priority; fall back to partial metadata for initial state
+  const mergedStreamingEvents = useMemo(() => {
+    const merged = new Map<string, StreamEvent[]>(partialEvents);
+    for (const [msgId, events] of streamingEvents) {
+      merged.set(msgId, events);
+    }
+    return merged;
+  }, [partialEvents, streamingEvents]);
+
   const isPanelOpen = isFileBrowserOpen || isGitPanelOpen;
   const isSearchActive = isSearchOpen && !!searchQuery;
   const displayMessages = isSearchActive
@@ -1031,7 +1075,7 @@ export default function ThreadViewPage() {
                           streamEvents={
                             isSearchActive
                               ? undefined
-                              : streamingEvents.get(msg.id)
+                              : mergedStreamingEvents.get(msg.id)
                           }
                           overrideStatus={
                             isSearchActive

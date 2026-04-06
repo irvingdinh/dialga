@@ -20,12 +20,21 @@ interface PendingRequest {
   timer: NodeJS.Timeout;
 }
 
+interface EventAccumulatorEntry {
+  events: Array<{ type: string; content: string }>;
+  textContent: string[];
+  threadId: string;
+  lastFlush: number;
+  flushTimer: NodeJS.Timeout | null;
+}
+
 @Injectable()
 export class GatewayService {
   private readonly logger = new Logger(GatewayService.name);
   private readonly connections = new Map<WebSocket, ConnectedMachine>();
   private readonly machineToSocket = new Map<string, WebSocket>();
   private readonly pendingRequests = new Map<string, PendingRequest>();
+  private readonly eventAccumulator = new Map<string, EventAccumulatorEntry>();
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(
@@ -49,6 +58,11 @@ export class GatewayService {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
     }
+    // Clear all accumulator timers
+    for (const [, entry] of this.eventAccumulator) {
+      if (entry.flushTimer) clearTimeout(entry.flushTimer);
+    }
+    this.eventAccumulator.clear();
   }
 
   async authenticateToken(token: string): Promise<Machine | null> {
@@ -284,6 +298,14 @@ export class GatewayService {
     });
     if (!message || message.thread.machine_id !== machineId) return;
 
+    // Accumulate event for periodic persistence
+    this.accumulateEvent(
+      data.message_id,
+      message.thread_id,
+      data.type,
+      data.content,
+    );
+
     // Fan out via Redis Pub/Sub → SSE
     await this.streamingService.publishMessageDelta(
       message.thread_id,
@@ -291,6 +313,75 @@ export class GatewayService {
       data.type,
       data.content,
     );
+  }
+
+  private accumulateEvent(
+    messageId: string,
+    threadId: string,
+    type: string,
+    content: string,
+  ): void {
+    let entry = this.eventAccumulator.get(messageId);
+    if (!entry) {
+      entry = {
+        events: [],
+        textContent: [],
+        threadId,
+        lastFlush: Date.now(),
+        flushTimer: null,
+      };
+      this.eventAccumulator.set(messageId, entry);
+    }
+
+    entry.events.push({ type, content });
+    if (type === 'text') {
+      entry.textContent.push(content);
+    }
+
+    // Schedule a flush if not already scheduled (every 5s)
+    if (!entry.flushTimer) {
+      entry.flushTimer = setTimeout(() => {
+        void this.flushAccumulatedEvents(messageId);
+      }, 5000);
+    }
+  }
+
+  private async flushAccumulatedEvents(messageId: string): Promise<void> {
+    const entry = this.eventAccumulator.get(messageId);
+    if (!entry || entry.events.length === 0) return;
+
+    entry.lastFlush = Date.now();
+    entry.flushTimer = null;
+
+    // Snapshot current state for persistence
+    const events = [...entry.events];
+    const content = entry.textContent.join('');
+
+    try {
+      await this.messageRepository.update(messageId, {
+        content: content || undefined,
+        metadata: JSON.stringify({ events, partial: true }),
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to flush streaming state for ${messageId}: ${err}`,
+      );
+    }
+
+    // Schedule next flush if still accumulating
+    if (this.eventAccumulator.has(messageId)) {
+      entry.flushTimer = setTimeout(() => {
+        void this.flushAccumulatedEvents(messageId);
+      }, 5000);
+    }
+  }
+
+  private clearAccumulator(messageId: string): void {
+    const entry = this.eventAccumulator.get(messageId);
+    if (entry?.flushTimer) {
+      clearTimeout(entry.flushTimer);
+    }
+    this.eventAccumulator.delete(messageId);
   }
 
   async handleTaskComplete(
@@ -302,6 +393,9 @@ export class GatewayService {
       metadata?: Record<string, unknown>;
     },
   ): Promise<void> {
+    // Clear the in-memory accumulator (no more partial flushes needed)
+    this.clearAccumulator(data.message_id);
+
     const message = await this.messageRepository.findOne({
       where: { id: data.message_id },
       relations: ['thread'],
