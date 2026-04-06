@@ -12,6 +12,58 @@ import { Machine, Message, Thread } from '../core/entities/index.js';
 import { GatewayService } from '../gateway/gateway.service.js';
 import { StreamingService } from '../streaming/streaming.service.js';
 
+interface UsageAccumulator {
+  cost: number;
+  inputTokens: number;
+  outputTokens: number;
+  duration: number;
+  count: number;
+}
+
+/** Parse metadata JSON and extract usage from `result` events. */
+function extractUsageFromMetadata(
+  metadata: string | object | null,
+): UsageAccumulator | null {
+  if (!metadata) return null;
+
+  let parsed: {
+    events?: Array<{ type: string; metadata?: Record<string, unknown> }>;
+  };
+  try {
+    parsed = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+  } catch {
+    return null;
+  }
+
+  if (!parsed.events || !Array.isArray(parsed.events)) return null;
+
+  const acc: UsageAccumulator = {
+    cost: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    duration: 0,
+    count: 0,
+  };
+
+  for (const event of parsed.events) {
+    if (event.type === 'result' && event.metadata) {
+      const cost = event.metadata.total_cost_usd as number | undefined;
+      const duration = event.metadata.duration_ms as number | undefined;
+      const usage = event.metadata.usage as
+        | { input_tokens?: number; output_tokens?: number }
+        | undefined;
+
+      if (cost) acc.cost += cost;
+      if (duration) acc.duration += duration;
+      if (usage?.input_tokens) acc.inputTokens += usage.input_tokens;
+      if (usage?.output_tokens) acc.outputTokens += usage.output_tokens;
+      acc.count++;
+    }
+  }
+
+  return acc.count > 0 ? acc : null;
+}
+
 @Injectable()
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
@@ -429,38 +481,14 @@ export class MessagesService {
     const models: Record<string, number> = {};
 
     for (const msg of messages) {
-      if (!msg.metadata) continue;
-
-      let parsed: {
-        events?: Array<{ type: string; metadata?: Record<string, unknown> }>;
-      };
-      try {
-        parsed =
-          typeof msg.metadata === 'string'
-            ? JSON.parse(msg.metadata)
-            : msg.metadata;
-      } catch {
-        continue;
+      const usage = extractUsageFromMetadata(msg.metadata);
+      if (usage) {
+        totalCost += usage.cost;
+        totalInputTokens += usage.inputTokens;
+        totalOutputTokens += usage.outputTokens;
+        totalDuration += usage.duration;
+        messageCount += usage.count;
       }
-
-      if (!parsed.events || !Array.isArray(parsed.events)) continue;
-
-      for (const event of parsed.events) {
-        if (event.type === 'result' && event.metadata) {
-          const cost = event.metadata.total_cost_usd as number | undefined;
-          const duration = event.metadata.duration_ms as number | undefined;
-          const usage = event.metadata.usage as
-            | { input_tokens?: number; output_tokens?: number }
-            | undefined;
-
-          if (cost) totalCost += cost;
-          if (duration) totalDuration += duration;
-          if (usage?.input_tokens) totalInputTokens += usage.input_tokens;
-          if (usage?.output_tokens) totalOutputTokens += usage.output_tokens;
-          messageCount++;
-        }
-      }
-
       if (msg.model) {
         models[msg.model] = (models[msg.model] || 0) + 1;
       }
@@ -533,54 +561,30 @@ export class MessagesService {
     >();
 
     for (const row of rows) {
-      if (!row.metadata) continue;
+      const usage = extractUsageFromMetadata(row.metadata);
+      if (usage) {
+        totalCost += usage.cost;
+        totalInputTokens += usage.inputTokens;
+        totalOutputTokens += usage.outputTokens;
+        totalDuration += usage.duration;
+        messageCount += usage.count;
 
-      let parsed: {
-        events?: Array<{ type: string; metadata?: Record<string, unknown> }>;
-      };
-      try {
-        parsed =
-          typeof row.metadata === 'string'
-            ? JSON.parse(row.metadata)
-            : row.metadata;
-      } catch {
-        continue;
-      }
-
-      if (!parsed.events || !Array.isArray(parsed.events)) continue;
-
-      for (const event of parsed.events) {
-        if (event.type === 'result' && event.metadata) {
-          const cost = event.metadata.total_cost_usd as number | undefined;
-          const duration = event.metadata.duration_ms as number | undefined;
-          const usage = event.metadata.usage as
-            | { input_tokens?: number; output_tokens?: number }
-            | undefined;
-
-          if (cost) totalCost += cost;
-          if (duration) totalDuration += duration;
-          if (usage?.input_tokens) totalInputTokens += usage.input_tokens;
-          if (usage?.output_tokens) totalOutputTokens += usage.output_tokens;
-          messageCount++;
-
-          // Per-machine aggregation
-          if (!machineMap.has(row.machine_id)) {
-            machineMap.set(row.machine_id, {
-              machine_id: row.machine_id,
-              machine_name: row.machine_name,
-              total_cost_usd: 0,
-              total_input_tokens: 0,
-              total_output_tokens: 0,
-              message_count: 0,
-            });
-          }
-          const m = machineMap.get(row.machine_id)!;
-          if (cost) m.total_cost_usd += cost;
-          if (usage?.input_tokens) m.total_input_tokens += usage.input_tokens;
-          if (usage?.output_tokens)
-            m.total_output_tokens += usage.output_tokens;
-          m.message_count++;
+        // Per-machine aggregation
+        if (!machineMap.has(row.machine_id)) {
+          machineMap.set(row.machine_id, {
+            machine_id: row.machine_id,
+            machine_name: row.machine_name,
+            total_cost_usd: 0,
+            total_input_tokens: 0,
+            total_output_tokens: 0,
+            message_count: 0,
+          });
         }
+        const m = machineMap.get(row.machine_id)!;
+        m.total_cost_usd += usage.cost;
+        m.total_input_tokens += usage.inputTokens;
+        m.total_output_tokens += usage.outputTokens;
+        m.message_count += usage.count;
       }
 
       if (row.model) {

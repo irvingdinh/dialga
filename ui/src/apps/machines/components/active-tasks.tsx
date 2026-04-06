@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoaderIcon, XIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -16,14 +16,31 @@ function elapsedTime(dateStr: string): string {
   return `${hours}h ${minutes % 60}m`;
 }
 
+/**
+ * Renders a live elapsed-time counter that updates via direct DOM mutation (no React re-renders).
+ */
+function ElapsedTime({ dateStr }: { dateStr: string }) {
+  const spanRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const el = spanRef.current;
+    if (!el) return;
+    el.textContent = elapsedTime(dateStr);
+    const id = setInterval(() => {
+      el.textContent = elapsedTime(dateStr);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [dateStr]);
+
+  return <span ref={spanRef} className="tabular-nums" />;
+}
+
 export function ActiveTasks({
   onNavigate,
 }: {
   onNavigate: (threadId: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const [, setTick] = useState(0);
-  const tickRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const { data } = useQuery({
     queryKey: ["tasks", "active"],
@@ -38,16 +55,6 @@ export function ActiveTasks({
     queryClient.invalidateQueries({ queryKey: ["threads-unread"] });
     queryClient.invalidateQueries({ queryKey: ["usage", "summary"] });
   });
-
-  // Tick every second to update elapsed times
-  useEffect(() => {
-    if (data?.tasks && data.tasks.length > 0) {
-      tickRef.current = setInterval(() => setTick((t) => t + 1), 1000);
-    }
-    return () => {
-      if (tickRef.current) clearInterval(tickRef.current);
-    };
-  }, [data?.tasks]);
 
   const handleCancel = useCallback(
     async (messageId: string, e: React.MouseEvent) => {
@@ -112,9 +119,7 @@ export function ActiveTasks({
                     </>
                   )}
                   <span className="text-muted-foreground/40">·</span>
-                  <span className="tabular-nums">
-                    {elapsedTime(task.started_at || task.created_at)}
-                  </span>
+                  <ElapsedTime dateStr={task.started_at || task.created_at} />
                 </div>
               </div>
 

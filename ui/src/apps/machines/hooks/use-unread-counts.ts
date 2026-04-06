@@ -12,31 +12,34 @@ export function useUnreadCounts(machines: Array<{ id: string }> | undefined) {
     [machines],
   );
 
-  const { data: threadsByMachine } = useQuery({
-    queryKey: ["threads-unread", machineIds],
-    queryFn: async () => {
-      const result: Record<
-        string,
-        Array<{ id: string; updated_at: string }>
-      > = {};
-      await Promise.all(
-        machineIds.map(async (id) => {
-          result[id] = await api.threads.list(id);
-        }),
-      );
-      return result;
-    },
+  // Single API call for ALL threads across all machines (replaces N per-machine calls)
+  const { data: allThreads } = useQuery({
+    queryKey: ["threads-unread"],
+    queryFn: () => api.threads.listAll(),
     enabled: machineIds.length > 0,
     staleTime: 30_000,
   });
 
   return useMemo(() => {
     const counts: Record<string, number> = {};
-    if (threadsByMachine) {
-      for (const [machineId, threads] of Object.entries(threadsByMachine)) {
+    if (allThreads) {
+      // Group threads by machine_id, then compute unread count per machine
+      const byMachine = new Map<
+        string,
+        Array<{ id: string; updated_at: string }>
+      >();
+      for (const thread of allThreads) {
+        let arr = byMachine.get(thread.machine_id);
+        if (!arr) {
+          arr = [];
+          byMachine.set(thread.machine_id, arr);
+        }
+        arr.push(thread);
+      }
+      for (const [machineId, threads] of byMachine) {
         counts[machineId] = getUnreadCount(threads);
       }
     }
     return counts;
-  }, [threadsByMachine, getUnreadCount]);
+  }, [allThreads, getUnreadCount]);
 }
