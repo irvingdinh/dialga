@@ -1,6 +1,10 @@
 import crypto from 'node:crypto';
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -71,5 +75,36 @@ export class AuthService {
         .digest('hex');
       await this.refreshTokenRepository.delete({ token_hash: tokenHash });
     }
+  }
+
+  async updateProfile(
+    userId: string,
+    data: { name?: string },
+  ): Promise<{ id: string; email: string; name: string }> {
+    const user = await this.userRepository.findOneByOrFail({ id: userId });
+
+    if (data.name !== undefined) {
+      user.name = data.name;
+    }
+
+    await this.userRepository.save(user);
+
+    return { id: user.id, email: user.email, name: user.name };
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.userRepository.findOneByOrFail({ id: userId });
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    user.password_hash = await bcrypt.hash(newPassword, 10);
+    await this.userRepository.save(user);
   }
 }

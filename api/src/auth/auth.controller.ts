@@ -2,12 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { IsEmail, IsString } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 import type { Request, Response } from 'express';
 
 import { CurrentUser } from '../core/decorators/current-user.decorator.js';
@@ -21,6 +22,22 @@ class LoginDto {
 
   @IsString()
   password: string;
+}
+
+class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  name?: string;
+}
+
+class ChangePasswordDto {
+  @IsString()
+  current_password: string;
+
+  @IsString()
+  @MinLength(6)
+  new_password: string;
 }
 
 @Controller('api/auth')
@@ -61,6 +78,29 @@ export class AuthController {
       email: user.email,
       name: user.name,
     };
+  }
+
+  @Patch('profile')
+  @UseGuards(AuthGuard)
+  async updateProfile(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.id, dto);
+  }
+
+  @Post('change-password')
+  @UseGuards(AuthGuard)
+  async changePassword(
+    @CurrentUser() user: User,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    await this.authService.changePassword(
+      user.id,
+      dto.current_password,
+      dto.new_password,
+    );
+    return { success: true };
   }
 
   @Post('logout')

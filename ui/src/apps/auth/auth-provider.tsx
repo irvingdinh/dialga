@@ -19,6 +19,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -41,6 +42,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(session);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const session = await api.auth.session();
+    setUser(session);
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.auth.logout();
@@ -55,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

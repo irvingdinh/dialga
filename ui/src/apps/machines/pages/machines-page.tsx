@@ -5,9 +5,8 @@ import {
   LoaderIcon,
   MessageSquareIcon,
   MonitorIcon,
-  MoonIcon,
   PlusIcon,
-  SunIcon,
+  SettingsIcon,
   XIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +17,6 @@ import { CreateMachineDialog } from "@/apps/machines/components/create-machine-d
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type HealthInfo } from "@/lib/api";
-import { useTheme } from "@/lib/theme";
 import { useUnread } from "@/lib/unread";
 
 function timeAgo(dateStr: string | null): string {
@@ -340,9 +338,8 @@ function useUnreadCounts(machines: Array<{ id: string }> | undefined) {
 }
 
 export default function MachinesPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { toggle, resolved } = useTheme();
   const [createOpen, setCreateOpen] = useState(false);
 
   const queryClient = useQueryClient();
@@ -414,15 +411,13 @@ export default function MachinesPage() {
             <PlusIcon data-icon="inline-start" />
             New
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={toggle}>
-            {resolved === "dark" ? (
-              <SunIcon className="size-4" />
-            ) : (
-              <MoonIcon className="size-4" />
-            )}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={logout}>
-            Sign out
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => navigate("/settings")}
+            title="Settings"
+          >
+            <SettingsIcon className="size-4" />
           </Button>
         </div>
       </div>

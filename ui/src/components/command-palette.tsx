@@ -209,6 +209,13 @@ export function CommandPalette() {
                 </span>
               </CommandItem>
               <CommandItem
+                value="user-settings-profile"
+                onSelect={() => navigateTo("/settings")}
+              >
+                <SettingsIcon className="text-muted-foreground mr-2 h-4 w-4" />
+                <span className="flex-1">Settings</span>
+              </CommandItem>
+              <CommandItem
                 value="go-home-machines"
                 onSelect={() => navigateTo("/machines")}
               >

@@ -3,8 +3,14 @@
   "version": "0.0.1",
   "description": "",
   "author": "",
-  "private": true,
   "license": "UNLICENSED",
+  "bin": {
+    "dialga-agent": "./bin/dialga-agent.js"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
   "scripts": {
     "build": "nest build",
     "format": "prettier --write --log-level warn \"src/**/*.ts\"",
