@@ -11,7 +11,14 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import type { Response } from 'express';
 
 import { CurrentUser } from '../core/decorators/current-user.decorator.js';
@@ -44,6 +51,17 @@ class UpdateThreadDto {
   @IsBoolean()
   @IsOptional()
   is_pinned?: boolean;
+}
+
+class BulkThreadDto {
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMinSize(1)
+  thread_ids!: string[];
+
+  @IsString()
+  @IsIn(['archive', 'unarchive', 'delete'])
+  action!: 'archive' | 'unarchive' | 'delete';
 }
 
 @Controller('api')
@@ -103,6 +121,16 @@ export class ThreadsController {
       created_at: t.created_at,
       updated_at: t.updated_at,
     };
+  }
+
+  @Post('threads/bulk')
+  async bulk(@CurrentUser() user: User, @Body() dto: BulkThreadDto) {
+    const count = await this.threadsService.bulk(
+      dto.thread_ids,
+      dto.action,
+      user.id,
+    );
+    return { success: true, affected: count };
   }
 
   @Get('threads/search')

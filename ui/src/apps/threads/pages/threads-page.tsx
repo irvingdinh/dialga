@@ -4,6 +4,7 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArrowLeftIcon,
+  CheckIcon,
   FolderIcon,
   MessageSquareIcon,
   PinIcon,
@@ -11,6 +12,7 @@ import {
   PlusIcon,
   SearchIcon,
   SettingsIcon,
+  SquareCheckBigIcon,
   Trash2Icon,
   WifiOffIcon,
   XIcon,
@@ -113,6 +115,12 @@ export default function ThreadsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { isUnread } = useUnread();
 
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionPending, setBulkActionPending] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const isSelectMode = selectedIds.size > 0;
+
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
@@ -122,6 +130,18 @@ export default function ThreadsPage() {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
   }, [searchInput]);
+
+  // Escape key exits selection mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isSelectMode) {
+        setSelectedIds(new Set());
+        setConfirmBulkDelete(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSelectMode]);
 
   const { data: machine } = useQuery({
     queryKey: ["machine", machineId],
@@ -261,7 +281,77 @@ export default function ThreadsPage() {
     [machineId, queryClient],
   );
 
+  const toggleSelect = useCallback((threadId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(threadId)) {
+        next.delete(threadId);
+      } else {
+        next.add(threadId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === filteredThreads.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredThreads.map((t) => t.id)));
+    }
+  }, [selectedIds.size, filteredThreads]);
+
+  const handleBulkAction = useCallback(
+    async (action: "archive" | "unarchive" | "delete") => {
+      if (selectedIds.size === 0) return;
+      if (action === "delete" && !confirmBulkDelete) {
+        setConfirmBulkDelete(true);
+        return;
+      }
+
+      setBulkActionPending(true);
+      try {
+        const result = await api.threads.bulk(Array.from(selectedIds), action);
+        setSelectedIds(new Set());
+        setConfirmBulkDelete(false);
+        queryClient.invalidateQueries({ queryKey: ["threads", machineId] });
+        const label =
+          action === "delete"
+            ? "deleted"
+            : action === "archive"
+              ? "archived"
+              : "unarchived";
+        toast.success(
+          `${result.affected} thread${result.affected !== 1 ? "s" : ""} ${label}`,
+        );
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : `Failed to ${action} threads`;
+        toast.error(message);
+      } finally {
+        setBulkActionPending(false);
+      }
+    },
+    [selectedIds, confirmBulkDelete, machineId, queryClient],
+  );
+
   const isOffline = machine?.status === "offline";
+
+  // Check if any selected thread is archived / active for contextual actions
+  const hasSelectedArchived = useMemo(
+    () =>
+      filteredThreads.some(
+        (t) => selectedIds.has(t.id) && t.status === "archived",
+      ),
+    [filteredThreads, selectedIds],
+  );
+  const hasSelectedActive = useMemo(
+    () =>
+      filteredThreads.some(
+        (t) => selectedIds.has(t.id) && t.status === "active",
+      ),
+    [filteredThreads, selectedIds],
+  );
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -292,6 +382,28 @@ export default function ThreadsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {filteredThreads.length > 0 && (
+            <Button
+              variant={isSelectMode ? "secondary" : "ghost"}
+              size="icon-sm"
+              onClick={() => {
+                if (isSelectMode) {
+                  setSelectedIds(new Set());
+                  setConfirmBulkDelete(false);
+                } else {
+                  // Enter select mode by selecting first thread
+                  toggleSelectAll();
+                }
+              }}
+              title={isSelectMode ? "Cancel selection" : "Select threads"}
+            >
+              {isSelectMode ? (
+                <XIcon className="size-4" />
+              ) : (
+                <SquareCheckBigIcon className="size-4" />
+              )}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -402,11 +514,39 @@ export default function ThreadsPage() {
         </div>
       )}
 
+      {/* Select All bar */}
+      {isSelectMode && filteredThreads.length > 0 && (
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            onClick={toggleSelectAll}
+            className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors"
+          >
+            <div
+              className={`flex size-4 items-center justify-center rounded border transition-colors ${
+                selectedIds.size === filteredThreads.length
+                  ? "border-blue-500 bg-blue-500 text-white"
+                  : "border-input"
+              }`}
+            >
+              {selectedIds.size === filteredThreads.length && (
+                <CheckIcon className="size-3" />
+              )}
+            </div>
+            {selectedIds.size === filteredThreads.length
+              ? "Deselect all"
+              : "Select all"}
+          </button>
+          <span className="text-muted-foreground text-xs">
+            {selectedIds.size} selected
+          </span>
+        </div>
+      )}
+
       {/* Thread List */}
       {threads && (
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-2 flex flex-col gap-2 pb-16">
           {filteredThreads.length === 0 && (
-            <div className="text-muted-foreground flex flex-col items-center py-16 text-center text-sm">
+            <div className="text-muted-foreground mt-2 flex flex-col items-center py-16 text-center text-sm">
               {searchQuery ? (
                 <>
                   <SearchIcon className="text-muted-foreground/40 mb-3 size-8" />
@@ -426,6 +566,7 @@ export default function ThreadsPage() {
 
           {filteredThreads.map((thread) => {
             const unread = isUnread(thread.id, thread.updated_at);
+            const isSelected = selectedIds.has(thread.id);
             return (
               <div key={thread.id} className="relative">
                 {deletingThreadId === thread.id ? (
@@ -452,17 +593,40 @@ export default function ThreadsPage() {
                   </div>
                 ) : (
                   <div
-                    className={`group hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${thread.status === "archived" ? "opacity-60" : ""}`}
+                    className={`group hover:bg-muted/50 flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${thread.status === "archived" ? "opacity-60" : ""} ${isSelected ? "border-blue-500/50 bg-blue-50/50 dark:border-blue-500/30 dark:bg-blue-950/20" : ""}`}
                   >
+                    {isSelectMode ? (
+                      <button
+                        onClick={() => toggleSelect(thread.id)}
+                        className="mt-0.5 shrink-0"
+                      >
+                        <div
+                          className={`flex size-4 items-center justify-center rounded border transition-colors ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-500 text-white"
+                              : "border-input hover:border-foreground/40"
+                          }`}
+                        >
+                          {isSelected && <CheckIcon className="size-3" />}
+                        </div>
+                      </button>
+                    ) : null}
                     <button
-                      onClick={() => navigate(`/threads/${thread.id}`)}
+                      onClick={() => {
+                        if (isSelectMode) {
+                          toggleSelect(thread.id);
+                        } else {
+                          navigate(`/threads/${thread.id}`);
+                        }
+                      }}
                       className="flex min-w-0 flex-1 items-start gap-3 text-left"
                     >
-                      {thread.is_pinned ? (
-                        <PinIcon className="mt-0.5 size-4 shrink-0 text-amber-500 dark:text-amber-400" />
-                      ) : (
-                        <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
-                      )}
+                      {!isSelectMode &&
+                        (thread.is_pinned ? (
+                          <PinIcon className="mt-0.5 size-4 shrink-0 text-amber-500 dark:text-amber-400" />
+                        ) : (
+                          <MessageSquareIcon className="text-muted-foreground/60 mt-0.5 size-4 shrink-0" />
+                        ))}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 truncate text-sm font-medium">
                           {unread && (
@@ -513,54 +677,130 @@ export default function ThreadsPage() {
                         </div>
                       </div>
                     </button>
-                    <div className="mt-0.5 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTogglePin(thread.id, thread.is_pinned);
-                        }}
-                        className={`hover:text-foreground ${thread.is_pinned ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/40"}`}
-                        title={thread.is_pinned ? "Unpin thread" : "Pin thread"}
-                      >
-                        {thread.is_pinned ? (
-                          <PinOffIcon className="size-4" />
-                        ) : (
-                          <PinIcon className="size-4" />
-                        )}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleArchive(thread.id, thread.status);
-                        }}
-                        className="text-muted-foreground/40 hover:text-foreground"
-                        title={
-                          thread.status === "archived"
-                            ? "Unarchive thread"
-                            : "Archive thread"
-                        }
-                      >
-                        {thread.status === "archived" ? (
-                          <ArchiveRestoreIcon className="size-4" />
-                        ) : (
-                          <ArchiveIcon className="size-4" />
-                        )}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeletingThreadId(thread.id);
-                        }}
-                        className="text-muted-foreground/40 hover:text-destructive"
-                      >
-                        <Trash2Icon className="size-4" />
-                      </button>
-                    </div>
+                    {!isSelectMode && (
+                      <div className="mt-0.5 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTogglePin(thread.id, thread.is_pinned);
+                          }}
+                          className={`hover:text-foreground ${thread.is_pinned ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/40"}`}
+                          title={
+                            thread.is_pinned ? "Unpin thread" : "Pin thread"
+                          }
+                        >
+                          {thread.is_pinned ? (
+                            <PinOffIcon className="size-4" />
+                          ) : (
+                            <PinIcon className="size-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleArchive(thread.id, thread.status);
+                          }}
+                          className="text-muted-foreground/40 hover:text-foreground"
+                          title={
+                            thread.status === "archived"
+                              ? "Unarchive thread"
+                              : "Archive thread"
+                          }
+                        >
+                          {thread.status === "archived" ? (
+                            <ArchiveRestoreIcon className="size-4" />
+                          ) : (
+                            <ArchiveIcon className="size-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingThreadId(thread.id);
+                          }}
+                          className="text-muted-foreground/40 hover:text-destructive"
+                        >
+                          <Trash2Icon className="size-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Floating Action Bar (multi-select) */}
+      {isSelectMode && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="bg-background pointer-events-auto flex items-center gap-2 rounded-2xl border px-4 py-2.5 shadow-lg">
+            {confirmBulkDelete ? (
+              <>
+                <span className="text-sm text-red-600 dark:text-red-400">
+                  Delete {selectedIds.size} thread
+                  {selectedIds.size !== 1 ? "s" : ""}?
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConfirmBulkDelete(false)}
+                  disabled={bulkActionPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleBulkAction("delete")}
+                  disabled={bulkActionPending}
+                >
+                  {bulkActionPending ? "Deleting..." : "Delete"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground mr-1 text-sm">
+                  {selectedIds.size} selected
+                </span>
+                {hasSelectedActive && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkAction("archive")}
+                    disabled={bulkActionPending}
+                    className="gap-1.5"
+                  >
+                    <ArchiveIcon className="size-3.5" />
+                    Archive
+                  </Button>
+                )}
+                {hasSelectedArchived && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkAction("unarchive")}
+                    disabled={bulkActionPending}
+                    className="gap-1.5"
+                  >
+                    <ArchiveRestoreIcon className="size-3.5" />
+                    Unarchive
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkAction("delete")}
+                  disabled={bulkActionPending}
+                  className="gap-1.5 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                >
+                  <Trash2Icon className="size-3.5" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       )}
 

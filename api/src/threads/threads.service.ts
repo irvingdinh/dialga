@@ -385,6 +385,47 @@ export class ThreadsService {
     return lines.join('\n');
   }
 
+  async bulk(
+    threadIds: string[],
+    action: 'archive' | 'unarchive' | 'delete',
+    userId: string,
+  ): Promise<number> {
+    // Verify all threads belong to the user via their machines
+    const threads = await this.threadRepository
+      .createQueryBuilder('thread')
+      .innerJoin('thread.machine', 'machine')
+      .where('thread.id IN (:...threadIds)', { threadIds })
+      .andWhere('machine.user_id = :userId', { userId })
+      .andWhere('machine.deleted_at IS NULL')
+      .getMany();
+
+    if (threads.length === 0) return 0;
+    const validIds = threads.map((t) => t.id);
+
+    if (action === 'delete') {
+      await this.messageRepository
+        .createQueryBuilder()
+        .delete()
+        .where('thread_id IN (:...ids)', { ids: validIds })
+        .execute();
+      await this.threadRepository
+        .createQueryBuilder()
+        .delete()
+        .where('id IN (:...ids)', { ids: validIds })
+        .execute();
+    } else {
+      const status = action === 'archive' ? 'archived' : 'active';
+      await this.threadRepository
+        .createQueryBuilder()
+        .update()
+        .set({ status })
+        .where('id IN (:...ids)', { ids: validIds })
+        .execute();
+    }
+
+    return validIds.length;
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const thread = await this.findOne(id, userId);
     await this.messageRepository.delete({ thread_id: id });

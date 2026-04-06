@@ -466,6 +466,11 @@ export const api = {
       request<{ success: true }>(`/api/threads/${threadId}`, {
         method: "DELETE",
       }),
+    bulk: (threadIds: string[], action: "archive" | "unarchive" | "delete") =>
+      request<{ success: true; affected: number }>(`/api/threads/bulk`, {
+        method: "POST",
+        body: JSON.stringify({ thread_ids: threadIds, action }),
+      }),
     search: (q: string) =>
       request<
         Array<{
