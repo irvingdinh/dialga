@@ -379,6 +379,18 @@ export const api = {
       request<{ success: true }>(`/api/threads/${threadId}`, {
         method: "DELETE",
       }),
+    search: (q: string) =>
+      request<
+        Array<{
+          id: string;
+          machine_id: string;
+          machine_name: string;
+          workspace_name: string | null;
+          title: string | null;
+          status: string;
+          updated_at: string;
+        }>
+      >(`/api/threads/search?q=${encodeURIComponent(q)}`),
     exportMarkdown: async (threadId: string): Promise<void> => {
       const res = await fetch(`/api/threads/${threadId}/export.md`, {
         credentials: "include",

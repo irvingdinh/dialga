@@ -99,6 +99,12 @@ export class ThreadsController {
     };
   }
 
+  @Get('threads/search')
+  async searchGlobal(@CurrentUser() user: User, @Query('q') q?: string) {
+    if (!q || q.trim().length === 0) return [];
+    return this.threadsService.searchGlobal(user.id, q.trim());
+  }
+
   @Get('threads/:id')
   async findOne(@CurrentUser() user: User, @Param('id') id: string) {
     const t = await this.threadsService.findOne(id, user.id);

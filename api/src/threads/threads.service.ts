@@ -152,6 +152,49 @@ export class ThreadsService {
     return { messageCounts, latestMessages };
   }
 
+  async searchGlobal(
+    userId: string,
+    q: string,
+    limit = 10,
+  ): Promise<
+    Array<{
+      id: string;
+      machine_id: string;
+      machine_name: string;
+      workspace_name: string | null;
+      title: string | null;
+      status: string;
+      updated_at: Date;
+    }>
+  > {
+    const qb = this.threadRepository
+      .createQueryBuilder('thread')
+      .innerJoin('thread.machine', 'machine')
+      .leftJoin('thread.workspace', 'workspace')
+      .leftJoin('thread.messages', 'message')
+      .select([
+        'thread.id AS id',
+        'thread.machine_id AS machine_id',
+        'machine.name AS machine_name',
+        'workspace.name AS workspace_name',
+        'thread.title AS title',
+        'thread.status AS status',
+        'thread.updated_at AS updated_at',
+      ])
+      .where('machine.user_id = :userId', { userId })
+      .andWhere('machine.deleted_at IS NULL')
+      .andWhere('(thread.title LIKE :q OR message.content LIKE :q)', {
+        q: `%${q}%`,
+      })
+      .groupBy('thread.id')
+      .addGroupBy('machine.id')
+      .addGroupBy('workspace.id')
+      .orderBy('thread.updated_at', 'DESC')
+      .limit(limit);
+
+    return qb.getRawMany();
+  }
+
   async create(
     machineId: string,
     userId: string,

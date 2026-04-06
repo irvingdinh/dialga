@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import { ProtectedRoute } from "@/apps/auth/protected-route";
+import { CommandPalette } from "@/components/command-palette";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { NotificationListener } from "@/lib/notifications";
 
@@ -19,6 +20,7 @@ export const Router = () => {
   return (
     <BrowserRouter>
       <NotificationListener />
+      <CommandPalette />
       <Suspense>
         <Routes>
           <Route
