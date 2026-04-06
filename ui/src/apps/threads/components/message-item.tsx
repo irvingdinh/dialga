@@ -8,11 +8,12 @@ import {
   GitForkIcon,
   Loader2Icon,
   OctagonAlertIcon,
+  PencilIcon,
   RotateCwIcon,
   TerminalIcon,
   UserIcon,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 
@@ -44,6 +45,7 @@ interface MessageItemProps {
   onCancel?: () => void;
   onRetry?: () => void;
   onFork?: () => void;
+  onEdit?: (content: string) => void;
 }
 
 const markdownComponents: Components = {
@@ -466,6 +468,19 @@ function ForkButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+function EditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-muted-foreground hover:text-foreground shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100 max-sm:opacity-100"
+      title="Edit message"
+    >
+      <PencilIcon className="size-3.5" />
+    </button>
+  );
+}
+
 function StatusIndicator({
   status,
   onCancel,
@@ -567,10 +582,14 @@ export function MessageItem({
   onCancel,
   onRetry,
   onFork,
+  onEdit,
 }: MessageItemProps) {
   const status = overrideStatus ?? message.status;
   const isUser = message.role === "user";
   const hasStreamEvents = streamEvents && streamEvents.length > 0;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
+  const editRef = useRef<HTMLTextAreaElement>(null);
   const metadataGroups = useMemo(
     () => parseMetadataEvents(message.metadata),
     [message.metadata],
@@ -582,6 +601,35 @@ export function MessageItem({
         : "",
     [isUser, status, message.content, message.metadata],
   );
+
+  useEffect(() => {
+    if (isEditing && editRef.current) {
+      editRef.current.focus();
+      editRef.current.setSelectionRange(
+        editRef.current.value.length,
+        editRef.current.value.length,
+      );
+    }
+  }, [isEditing]);
+
+  const startEditing = useCallback(() => {
+    setEditContent(message.content);
+    setIsEditing(true);
+  }, [message.content]);
+
+  const cancelEditing = useCallback(() => {
+    setIsEditing(false);
+    setEditContent(message.content);
+  }, [message.content]);
+
+  const submitEdit = useCallback(() => {
+    if (!editContent.trim() || editContent === message.content) {
+      cancelEditing();
+      return;
+    }
+    onEdit?.(editContent.trim());
+    setIsEditing(false);
+  }, [editContent, message.content, onEdit, cancelEditing]);
 
   if (isUser) {
     return (
@@ -598,12 +646,42 @@ export function MessageItem({
                 minute: "2-digit",
               })}
             </span>
-            <CopyMessageButton text={message.content} />
-            {onFork && <ForkButton onClick={onFork} />}
+            {!isEditing && <CopyMessageButton text={message.content} />}
+            {!isEditing && onFork && <ForkButton onClick={onFork} />}
+            {!isEditing && onEdit && <EditButton onClick={startEditing} />}
           </div>
-          <p className="mt-1 text-sm leading-relaxed break-words whitespace-pre-wrap">
-            {message.content}
-          </p>
+          {isEditing ? (
+            <div className="mt-1">
+              <textarea
+                ref={editRef}
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submitEdit();
+                  }
+                  if (e.key === "Escape") {
+                    cancelEditing();
+                  }
+                }}
+                className="border-input bg-background focus:ring-ring w-full resize-none rounded-md border px-3 py-2 text-sm leading-relaxed focus:ring-1 focus:outline-none"
+                rows={Math.min(10, Math.max(2, editContent.split("\n").length))}
+              />
+              <div className="mt-1.5 flex items-center gap-2">
+                <Button size="xs" onClick={submitEdit}>
+                  Save & Re-run
+                </Button>
+                <Button size="xs" variant="ghost" onClick={cancelEditing}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm leading-relaxed break-words whitespace-pre-wrap">
+              {message.content}
+            </p>
+          )}
         </div>
       </div>
     );

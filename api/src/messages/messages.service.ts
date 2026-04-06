@@ -601,6 +601,99 @@ export class MessagesService {
     };
   }
 
+  async edit(
+    messageId: string,
+    userId: string,
+    content: string,
+  ): Promise<{ userMessage: Message; assistantMessage: Message }> {
+    const message = await this.messageRepository.findOne({
+      where: { id: messageId },
+      relations: ['thread', 'thread.machine', 'thread.workspace'],
+    });
+    if (!message) throw new NotFoundException('Message not found');
+    if (message.thread.machine.user_id !== userId)
+      throw new ForbiddenException();
+
+    if (message.role !== 'user') {
+      throw new BadRequestException('Can only edit user messages');
+    }
+
+    // Update the user message content via QueryBuilder (avoids entity tracking side effects)
+    await this.messageRepository
+      .createQueryBuilder()
+      .update()
+      .set({ content })
+      .where('id = :id', { id: message.id })
+      .execute();
+    message.content = content;
+
+    // Find all messages after this one in the thread (using UUIDv7 ID ordering — avoids
+    // datetime precision loss between MySQL microseconds and JavaScript milliseconds)
+    const subsequentMessages = await this.messageRepository
+      .createQueryBuilder('msg')
+      .where('msg.thread_id = :threadId', { threadId: message.thread_id })
+      .andWhere('msg.id > :msgId', { msgId: message.id })
+      .getMany();
+
+    // Cancel any running/queued tasks before deleting
+    for (const msg of subsequentMessages) {
+      if (
+        msg.role === 'assistant' &&
+        (msg.status === 'queued' || msg.status === 'running')
+      ) {
+        this.gatewayService.sendToMachine(
+          message.thread.machine_id,
+          'task:cancel',
+          { message_id: msg.id },
+        );
+      }
+    }
+
+    // Delete subsequent messages using QueryBuilder (avoids TypeORM entity tracking issues)
+    if (subsequentMessages.length > 0) {
+      const ids = subsequentMessages.map((m) => m.id);
+      await this.messageRepository
+        .createQueryBuilder()
+        .delete()
+        .where('id IN (:...ids)', { ids })
+        .execute();
+    }
+
+    // Create new assistant message (queued)
+    const assistantMessage = this.messageRepository.create({
+      thread_id: message.thread_id,
+      role: 'assistant',
+      content: '',
+      model: null,
+      status: 'queued',
+    });
+    await this.messageRepository.save(assistantMessage);
+
+    // Touch thread updated_at
+    const thread = message.thread;
+    thread.updated_at = new Date();
+    await this.threadRepository.save(thread);
+
+    // Dispatch task to agent
+    await this.gatewayService.dispatchTaskWithPrompt(
+      thread.machine_id,
+      assistantMessage,
+      thread,
+      content,
+    );
+
+    // Notify thread list about activity
+    await this.streamingService.publishThreadUpdate(
+      thread.machine_id,
+      thread.id,
+      content.slice(0, 100),
+      'active',
+      thread.updated_at,
+    );
+
+    return { userMessage: message, assistantMessage };
+  }
+
   async getAsJsonl(threadId: string): Promise<string> {
     const messages = await this.messageRepository.find({
       where: { thread_id: threadId },

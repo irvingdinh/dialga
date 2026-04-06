@@ -28,6 +28,11 @@ class SendMessageDto {
   model?: string;
 }
 
+class EditMessageDto {
+  @IsString()
+  content: string;
+}
+
 @Controller('api')
 @UseGuards(AuthGuard)
 export class MessagesController {
@@ -139,6 +144,38 @@ export class MessagesController {
         model: m.model,
         status: m.status,
         created_at: m.created_at,
+      },
+    };
+  }
+
+  @Post('messages/:id/edit')
+  async edit(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: EditMessageDto,
+  ) {
+    const { userMessage, assistantMessage } = await this.messagesService.edit(
+      id,
+      user.id,
+      dto.content,
+    );
+    return {
+      user_message: {
+        id: userMessage.id,
+        thread_id: userMessage.thread_id,
+        role: userMessage.role,
+        content: userMessage.content,
+        status: userMessage.status,
+        created_at: userMessage.created_at,
+      },
+      assistant_message: {
+        id: assistantMessage.id,
+        thread_id: assistantMessage.thread_id,
+        role: assistantMessage.role,
+        content: assistantMessage.content,
+        model: assistantMessage.model,
+        status: assistantMessage.status,
+        created_at: assistantMessage.created_at,
       },
     };
   }

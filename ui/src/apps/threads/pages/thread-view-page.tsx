@@ -426,6 +426,57 @@ export default function ThreadViewPage() {
     [threadId, queryClient, navigate],
   );
 
+  const handleEdit = useCallback(
+    async (messageId: string, content: string) => {
+      if (!threadId) return;
+      try {
+        const result = await api.messages.edit(messageId, content);
+        // Replace all messages: keep messages up to and including the edited one,
+        // then append the new assistant message
+        queryClient.setQueryData(
+          ["messages", threadId],
+          (old: InfiniteData<MessagesPage> | undefined) => {
+            if (!old) return old;
+            const allMessages = old.pages
+              .slice()
+              .reverse()
+              .flatMap((p) => p.messages);
+            const editIdx = allMessages.findIndex((m) => m.id === messageId);
+            if (editIdx === -1) return old;
+            const kept = allMessages.slice(0, editIdx + 1);
+            // Update edited message content
+            kept[editIdx] = { ...kept[editIdx], content };
+            // Append new assistant message
+            kept.push({
+              id: result.assistant_message.id,
+              thread_id: threadId,
+              role: "assistant" as const,
+              content: "",
+              model: result.assistant_message.model,
+              status: result.assistant_message.status,
+              metadata: null,
+              started_at: null,
+              completed_at: null,
+              created_at: result.assistant_message.created_at,
+            });
+            return {
+              pages: [{ messages: kept, has_more: false }],
+              pageParams: [undefined],
+            };
+          },
+        );
+        // Clear any stale streaming state for removed messages
+        setStreamingEvents(new Map());
+        queryClient.invalidateQueries({ queryKey: ["threads"] });
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : "Failed to edit message";
+        toast.error(message);
+      }
+    },
+    [threadId, queryClient, setStreamingEvents],
+  );
+
   const handleLoadOlder = useCallback(async () => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -763,6 +814,11 @@ export default function ThreadViewPage() {
                           onFork={
                             !isSearchActive
                               ? () => handleFork(msg.id)
+                              : undefined
+                          }
+                          onEdit={
+                            !isSearchActive && msg.role === "user"
+                              ? (content: string) => handleEdit(msg.id, content)
                               : undefined
                           }
                         />

@@ -338,6 +338,29 @@ export const api = {
           created_at: string;
         };
       }>(`/api/messages/${messageId}/retry`, { method: "POST" }),
+    edit: (messageId: string, content: string) =>
+      request<{
+        user_message: {
+          id: string;
+          thread_id: string;
+          role: string;
+          content: string;
+          status: string;
+          created_at: string;
+        };
+        assistant_message: {
+          id: string;
+          thread_id: string;
+          role: string;
+          content: string;
+          model: string | null;
+          status: string;
+          created_at: string;
+        };
+      }>(`/api/messages/${messageId}/edit`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      }),
   },
 
   tasks: {
