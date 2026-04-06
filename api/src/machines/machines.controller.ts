@@ -14,7 +14,8 @@ import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { CurrentUser } from '../core/decorators/current-user.decorator.js';
 import type { User } from '../core/entities/index.js';
 import { AuthGuard } from '../core/guards/auth.guard.js';
-import { GatewayService } from '../gateway/gateway.service.js';
+import { FsProxyService } from '../gateway/fs-proxy.service.js';
+import { GitProxyService } from '../gateway/git-proxy.service.js';
 import { MachinesService } from './machines.service.js';
 
 class CreateMachineDto {
@@ -69,7 +70,8 @@ class GitCommitDto {
 export class MachinesController {
   constructor(
     private readonly machinesService: MachinesService,
-    private readonly gatewayService: GatewayService,
+    private readonly fsProxyService: FsProxyService,
+    private readonly gitProxyService: GitProxyService,
   ) {}
 
   @Get()
@@ -155,7 +157,7 @@ export class MachinesController {
   ) {
     // Verify ownership
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.fsListDirectory(machineId, dirPath || '/');
+    return this.fsProxyService.listDirectory(machineId, dirPath || '/');
   }
 
   @Post(':machineId/fs/mkdir')
@@ -165,7 +167,7 @@ export class MachinesController {
     @Body() body: { path: string },
   ) {
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.fsMkdir(machineId, body.path);
+    return this.fsProxyService.mkdir(machineId, body.path);
   }
 
   @Get(':machineId/fs/read')
@@ -175,7 +177,7 @@ export class MachinesController {
     @Query('path') filePath: string,
   ) {
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.fsReadFile(machineId, filePath || '/');
+    return this.fsProxyService.readFile(machineId, filePath || '/');
   }
 
   @Get(':machineId/git/status')
@@ -185,7 +187,7 @@ export class MachinesController {
     @Query('path') dirPath: string,
   ) {
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.gitStatus(machineId, dirPath);
+    return this.gitProxyService.status(machineId, dirPath);
   }
 
   @Get(':machineId/git/diff')
@@ -196,7 +198,7 @@ export class MachinesController {
     @Query('file') file?: string,
   ) {
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.gitDiff(machineId, dirPath, file);
+    return this.gitProxyService.diff(machineId, dirPath, file);
   }
 
   @Get(':machineId/git/log')
@@ -207,7 +209,7 @@ export class MachinesController {
     @Query('limit') limit?: string,
   ) {
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.gitLog(
+    return this.gitProxyService.log(
       machineId,
       dirPath,
       limit ? parseInt(limit, 10) : undefined,
@@ -221,7 +223,7 @@ export class MachinesController {
     @Body() dto: GitStageDto,
   ) {
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.gitStage(machineId, dto.path, dto.files);
+    return this.gitProxyService.stage(machineId, dto.path, dto.files);
   }
 
   @Post(':machineId/git/unstage')
@@ -231,7 +233,7 @@ export class MachinesController {
     @Body() dto: GitStageDto,
   ) {
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.gitUnstage(machineId, dto.path, dto.files);
+    return this.gitProxyService.unstage(machineId, dto.path, dto.files);
   }
 
   @Post(':machineId/git/commit')
@@ -241,6 +243,6 @@ export class MachinesController {
     @Body() dto: GitCommitDto,
   ) {
     await this.machinesService.findOne(machineId, user.id);
-    return this.gatewayService.gitCommit(machineId, dto.path, dto.message);
+    return this.gitProxyService.commit(machineId, dto.path, dto.message);
   }
 }
