@@ -45,18 +45,39 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">dialga</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Sign in to your account
+    <div className="login-bg relative flex min-h-dvh flex-col items-center justify-center px-4">
+      <div className="login-grid pointer-events-none absolute inset-0" />
+
+      <div className="relative z-10 w-full max-w-sm">
+        {/* Brand */}
+        <div className="login-reveal mb-12 text-center">
+          <div className="mb-3 flex items-center justify-center gap-3">
+            <span className="bg-border h-px max-w-12 flex-1" />
+            <span className="login-diamond text-muted-foreground text-[10px]">
+              ◆
+            </span>
+            <span className="bg-border h-px max-w-12 flex-1" />
+          </div>
+          <h1 className="text-foreground text-[2rem] leading-none font-bold tracking-[0.3em] uppercase">
+            dialga
+          </h1>
+          <p className="text-muted-foreground/70 mt-3 text-[11px] font-medium tracking-[0.15em] uppercase">
+            Remote AI Agent Control
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {/* Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="login-reveal-2 flex flex-col gap-5"
+        >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label
+              htmlFor="email"
+              className="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase"
+            >
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
@@ -66,28 +87,50 @@ export default function LoginPage() {
               required
               autoComplete="email"
               autoFocus
+              className="h-11"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="password">Password</Label>
+            <Label
+              htmlFor="password"
+              className="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase"
+            >
+              Password
+            </Label>
             <Input
               id="password"
               type="password"
-              placeholder="Password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
+              className="h-11"
             />
           </div>
 
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && (
+            <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
+              {error}
+            </div>
+          )}
 
-          <Button type="submit" disabled={submitting} className="mt-2">
+          <Button
+            type="submit"
+            disabled={submitting}
+            className="mt-1 h-11 text-[13px] font-semibold tracking-[0.08em] uppercase"
+          >
             {submitting ? "Signing in..." : "Sign in"}
           </Button>
         </form>
+
+        {/* Footer */}
+        <div className="login-reveal-3 mt-16 text-center">
+          <p className="text-muted-foreground/30 text-[10px] tracking-[0.15em] uppercase">
+            Manage your machines and AI agents
+          </p>
+        </div>
       </div>
     </div>
   );
