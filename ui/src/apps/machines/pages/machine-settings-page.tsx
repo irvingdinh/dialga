@@ -6,6 +6,7 @@ import {
   CheckIcon,
   CpuIcon,
   KeyRoundIcon,
+  ScrollTextIcon,
   XCircleIcon,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
@@ -273,6 +274,17 @@ export default function MachineSettingsPage() {
 
           {/* Machine Health */}
           <MachineHealth healthInfo={machine.health_info ?? null} />
+
+          {/* Agent Logs link */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full"
+            onClick={() => navigate(`/machines/${machineId}/logs`)}
+          >
+            <ScrollTextIcon className="size-4" />
+            View Agent Logs
+          </Button>
 
           <Separator className="my-6" />
 

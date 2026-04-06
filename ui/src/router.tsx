@@ -14,6 +14,9 @@ const MachinesPage = lazy(() => import("./apps/machines/pages/machines-page"));
 const MachineSettingsPage = lazy(
   () => import("./apps/machines/pages/machine-settings-page"),
 );
+const MachineLogsPage = lazy(
+  () => import("./apps/machines/pages/machine-logs-page"),
+);
 const ThreadsPage = lazy(() => import("./apps/threads/pages/threads-page"));
 const ThreadViewPage = lazy(
   () => import("./apps/threads/pages/thread-view-page"),
@@ -57,6 +60,16 @@ export const Router = () => {
               <ProtectedRoute>
                 <ErrorBoundary>
                   <MachineSettingsPage />
+                </ErrorBoundary>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/machines/:machineId/logs"
+            element={
+              <ProtectedRoute>
+                <ErrorBoundary>
+                  <MachineLogsPage />
                 </ErrorBoundary>
               </ProtectedRoute>
             }

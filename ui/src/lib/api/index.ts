@@ -1,3 +1,4 @@
+export { type AgentLogEntry, agentLogsApi } from "./agent-logs";
 export { authApi } from "./auth";
 export { ApiError, type HealthInfo } from "./client";
 export { activityApi, tasksApi, usageApi } from "./dashboard";
@@ -8,6 +9,7 @@ export { messagesApi } from "./messages";
 export { threadsApi } from "./threads";
 export { workspacesApi } from "./workspaces";
 
+import { agentLogsApi } from "./agent-logs";
 import { authApi } from "./auth";
 import { activityApi, tasksApi, usageApi } from "./dashboard";
 import { fsApi } from "./fs";
@@ -28,4 +30,5 @@ export const api = {
   tasks: tasksApi,
   activity: activityApi,
   usage: usageApi,
+  agentLogs: agentLogsApi,
 };

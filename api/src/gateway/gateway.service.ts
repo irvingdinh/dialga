@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { WebSocket } from 'ws';
 
+import { AgentLogsService } from '../agent-logs/agent-logs.service.js';
 import { Machine, Message, Thread } from '../core/entities/index.js';
 import { StreamingService } from '../streaming/streaming.service.js';
 
@@ -45,6 +46,7 @@ export class GatewayService {
     @InjectRepository(Thread)
     private readonly threadRepository: Repository<Thread>,
     private readonly streamingService: StreamingService,
+    private readonly agentLogsService: AgentLogsService,
   ) {}
 
   onModuleInit() {
@@ -102,6 +104,13 @@ export class GatewayService {
 
     // Broadcast machine status change via SSE
     await this.streamingService.publishMachineStatus(machineId, 'online', now);
+
+    // Record agent log
+    void this.agentLogsService.record(
+      machineId,
+      'connected',
+      'Agent connected',
+    );
   }
 
   async handleDisconnect(socket: WebSocket): Promise<void> {
@@ -124,6 +133,13 @@ export class GatewayService {
       conn.machineId,
       'offline',
       now,
+    );
+
+    // Record agent log
+    void this.agentLogsService.record(
+      conn.machineId,
+      'disconnected',
+      'Agent disconnected',
     );
   }
 
@@ -281,6 +297,14 @@ export class GatewayService {
       message.id,
       'running',
     );
+
+    // Record agent log
+    void this.agentLogsService.record(
+      machineId,
+      'task_started',
+      `Task started: ${data.message_id}`,
+      { message_id: data.message_id, thread_id: message.thread_id },
+    );
   }
 
   async handleTaskOutput(
@@ -421,6 +445,24 @@ export class GatewayService {
       `Task complete: message ${data.message_id} → ${data.status}`,
     );
 
+    // Record agent log
+    const logTypeMap: Record<string, string> = {
+      completed: 'task_completed',
+      error: 'task_error',
+      cancelled: 'task_cancelled',
+      timed_out: 'task_timed_out',
+    };
+    void this.agentLogsService.record(
+      machineId,
+      logTypeMap[data.status] || 'task_completed',
+      `Task ${data.status}: ${data.message_id}${data.summary ? ` — ${data.summary.slice(0, 100)}` : ''}`,
+      {
+        message_id: data.message_id,
+        thread_id: message.thread_id,
+        status: data.status,
+      },
+    );
+
     // Fan out completion via Redis → SSE
     await this.streamingService.publishMessageComplete(
       message.thread_id,
@@ -496,6 +538,25 @@ export class GatewayService {
     void this.machineRepository.query(
       'UPDATE machines SET health_info = ? WHERE id = ?',
       [JSON.stringify(data), machineId],
+    );
+
+    // Record agent log
+    const agents = data.agents as
+      | Record<string, { available: boolean; version?: string }>
+      | undefined;
+    const agentSummary = agents
+      ? Object.entries(agents)
+          .map(
+            ([name, info]) =>
+              `${name}: ${info.available ? `v${info.version}` : 'unavailable'}`,
+          )
+          .join(', ')
+      : 'unknown';
+    void this.agentLogsService.record(
+      machineId,
+      'health_report',
+      `Health report: ${agentSummary}`,
+      data,
     );
   }
 

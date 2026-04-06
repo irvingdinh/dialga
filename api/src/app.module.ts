@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
+import { AgentLogsModule } from './agent-logs/agent-logs.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CoreModule } from './core/core.module.js';
 import { GatewayModule } from './gateway/gateway.module.js';
@@ -21,6 +22,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     CoreModule,
     StreamingModule,
     AuthModule,
+    AgentLogsModule,
     HealthModule,
     MachinesModule,
     WorkspacesModule,
